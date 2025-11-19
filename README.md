@@ -72,6 +72,10 @@ npm run build
 npm start
 ```
 
+### 배포
+
+이 프로젝트는 [Vercel](https://vercel.com)을 통해 배포할 수 있습니다. 자세한 배포 방법은 [배포 가이드](./docs/DEPLOYMENT.md)를 참고하세요.
+
 ## 📚 주요 기능
 
 ### 1. 학생 관리
@@ -105,6 +109,7 @@ npm start
 - [아키텍처 설계](./docs/ARCHITECTURE.md)
 - [API 명세서](./docs/API.md)
 - [데이터베이스 설계](./docs/DATABASE.md)
+- [배포 가이드](./docs/DEPLOYMENT.md)
 
 ## 🤝 기여하기
 
