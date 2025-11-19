@@ -1,36 +1,110 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 학원 관리 시스템 (Academy Management System)
 
-## Getting Started
+학원의 학생, 강사, 수업, 수강료 등을 효율적으로 관리할 수 있는 웹 애플리케이션입니다.
 
-First, run the development server:
+## 📋 프로젝트 개요
+
+이 프로젝트는 학원 운영에 필요한 핵심 기능들을 제공하는 통합 관리 시스템입니다. 학생 등록, 강사 관리, 수업 스케줄링, 출석 관리, 수강료 결제 등의 기능을 포함합니다.
+
+## 🚀 기술 스택
+
+- **프레임워크**: Next.js 16.0.3
+- **언어**: TypeScript 5
+- **UI 라이브러리**: React 19.2.0
+- **스타일링**: Tailwind CSS 4
+- **패키지 관리**: npm
+
+## 📁 프로젝트 구조
+
+```
+academy/
+├── src/
+│   └── app/              # Next.js App Router
+│       ├── layout.tsx    # 루트 레이아웃
+│       ├── page.tsx      # 홈 페이지
+│       └── globals.css   # 전역 스타일
+├── public/               # 정적 파일
+├── docs/                 # 개발 문서
+│   ├── DEVELOPMENT.md   # 개발 계획서
+│   ├── ARCHITECTURE.md  # 아키텍처 설계
+│   └── API.md           # API 명세서
+├── package.json
+└── README.md
+```
+
+## 🛠️ 설치 및 실행
+
+### 필수 요구사항
+
+- Node.js 18.0 이상
+- npm 또는 yarn
+
+### 설치
+
+```bash
+npm install
+```
+
+### 개발 서버 실행
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+브라우저에서 [http://localhost:3000](http://localhost:3000)을 열어 확인하세요.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 프로덕션 빌드
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+npm start
+```
 
-## Learn More
+## 📚 주요 기능
 
-To learn more about Next.js, take a look at the following resources:
+### 1. 학생 관리
+- 학생 등록 및 정보 수정
+- 학생 목록 조회 및 검색
+- 학생별 수강 이력 관리
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 2. 강사 관리
+- 강사 등록 및 정보 관리
+- 강사별 담당 수업 관리
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 3. 수업 관리
+- 수업 등록 및 스케줄 관리
+- 수업별 학생 등록
+- 수업 시간표 관리
 
-## Deploy on Vercel
+### 4. 출석 관리
+- 출석 체크 및 기록
+- 출석 통계 조회
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 5. 수강료 관리
+- 수강료 결제 처리
+- 결제 이력 조회
+- 미납 관리
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📖 문서
+
+자세한 개발 문서는 `docs/` 디렉토리를 참고하세요:
+
+- [개발 계획서](./docs/DEVELOPMENT.md)
+- [아키텍처 설계](./docs/ARCHITECTURE.md)
+- [API 명세서](./docs/API.md)
+
+## 🤝 기여하기
+
+1. 이 저장소를 포크합니다
+2. 기능 브랜치를 생성합니다 (`git checkout -b feature/AmazingFeature`)
+3. 변경사항을 커밋합니다 (`git commit -m 'Add some AmazingFeature'`)
+4. 브랜치에 푸시합니다 (`git push origin feature/AmazingFeature`)
+5. Pull Request를 생성합니다
+
+## 📝 라이선스
+
+이 프로젝트는 MIT 라이선스를 따릅니다.
+
+## 📞 문의
+
+프로젝트 관련 문의사항이 있으시면 이슈를 생성해주세요.
