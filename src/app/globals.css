@@ -56,3 +56,8 @@ body {
     max-width: 1280px;
   }
 }
+
+/* Next.js 개발 도구 포털 숨기기 */
+nextjs-portal {
+  display: none !important;
+}
