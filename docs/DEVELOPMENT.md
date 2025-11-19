@@ -54,10 +54,13 @@
 - **Tailwind CSS**: 유틸리티 기반 스타일링
 - **React 19**: 최신 React 기능 활용
 
-### 백엔드 (향후 계획)
+### 백엔드
 - **Next.js API Routes**: 서버 사이드 API
-- **데이터베이스**: PostgreSQL 또는 MySQL (예정)
-- **인증**: NextAuth.js 또는 JWT (예정)
+- **Supabase**: PostgreSQL 기반 백엔드 서비스
+  - 데이터베이스: PostgreSQL
+  - 인증: Supabase Auth (향후 구현)
+  - 실시간 기능: Supabase Realtime (향후 활용)
+- **Supabase Client**: `@supabase/supabase-js`를 통한 데이터베이스 접근
 
 ### 개발 도구
 - **ESLint**: 코드 품질 관리

@@ -23,9 +23,12 @@
 └─────────────────┬───────────────────────┘
                   │
 ┌─────────────────▼───────────────────────┐
-│         데이터베이스 (향후)              │
+│         Supabase (PostgreSQL)            │
 │  ┌───────────────────────────────────┐  │
-│  │   PostgreSQL / MySQL             │  │
+│  │   Supabase Client                │  │
+│  │   - Authentication               │  │
+│  │   - Database                     │  │
+│  │   - Storage                      │  │
 │  └───────────────────────────────────┘  │
 └─────────────────────────────────────────┘
 ```
@@ -71,6 +74,9 @@ academy/
 │   │       ├── attendance/
 │   │       └── payments/
 │   ├── lib/                         # 유틸리티 및 헬퍼 함수
+│   │   ├── supabase/               # Supabase 클라이언트
+│   │   │   ├── client.ts          # 클라이언트 컴포넌트용
+│   │   │   └── server.ts          # 서버 컴포넌트용
 │   │   ├── utils.ts
 │   │   ├── validations.ts
 │   │   └── constants.ts
@@ -141,11 +147,29 @@ Component
   ↓
 useEffect / Server Component
   ↓
+Supabase Client (lib/supabase/client.ts 또는 server.ts)
+  ↓
+Supabase API
+  ↓
+PostgreSQL Database (Supabase)
+  ↓
+Response
+  ↓
+Component State Update
+```
+
+또는 Next.js API Routes를 통한 경우:
+
+```
+Component
+  ↓
 API Route (app/api/students/route.ts)
   ↓
-Business Logic
+Supabase Client (lib/supabase/server.ts)
   ↓
-Database (향후)
+Supabase API
+  ↓
+PostgreSQL Database (Supabase)
   ↓
 Response
   ↓

@@ -12,6 +12,7 @@
 - **언어**: TypeScript 5
 - **UI 라이브러리**: React 19.2.0
 - **스타일링**: Tailwind CSS 4
+- **데이터베이스**: Supabase (PostgreSQL)
 - **패키지 관리**: npm
 
 ## 📁 프로젝트 구조
@@ -44,6 +45,17 @@ academy/
 ```bash
 npm install
 ```
+
+### 환경 변수 설정
+
+프로젝트 루트에 `.env.local` 파일을 생성하고 다음 내용을 추가하세요:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://krcncyrwiirgfvzsqpjy.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+```
+
+> **참고**: `.env.local` 파일은 Git에 커밋되지 않습니다. 실제 Supabase API 키를 사용하세요.
 
 ### 개발 서버 실행
 
@@ -92,6 +104,7 @@ npm start
 - [개발 계획서](./docs/DEVELOPMENT.md)
 - [아키텍처 설계](./docs/ARCHITECTURE.md)
 - [API 명세서](./docs/API.md)
+- [데이터베이스 설계](./docs/DATABASE.md)
 
 ## 🤝 기여하기
 
