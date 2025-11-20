@@ -605,26 +605,29 @@ export default function PaymentsPage() {
       </div>
 
       {/* 통계 카드 */}
-      <div className={`grid grid-cols-1 md:grid-cols-4 ${expectedRevenue !== null ? 'lg:grid-cols-5' : ''} gap-4 mb-6`}>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white border rounded-lg p-4">
-          <div className="text-sm text-gray-500 mb-1">해당 달 매출액</div>
-          <div className="text-2xl font-bold text-gray-900">
-            {statistics.totalRevenue.toLocaleString()}원
-          </div>
+          {expectedRevenue !== null ? (
+            <>
+              <div className="text-sm text-blue-600 mb-1 font-medium">다음 달 예상 매출액</div>
+              <div className="text-2xl font-bold text-blue-600">
+                {loadingExpectedRevenue ? (
+                  <span className="text-sm">계산 중...</span>
+                ) : (
+                  `${expectedRevenue.toLocaleString()}원`
+                )}
+              </div>
+              <div className="text-xs text-gray-500 mt-1">재학생 기준 예상</div>
+            </>
+          ) : (
+            <>
+              <div className="text-sm text-gray-500 mb-1">해당 달 매출액</div>
+              <div className="text-2xl font-bold text-gray-900">
+                {statistics.totalRevenue.toLocaleString()}원
+              </div>
+            </>
+          )}
         </div>
-        {expectedRevenue !== null && (
-          <div className="bg-white border-2 border-blue-300 rounded-lg p-4">
-            <div className="text-sm text-blue-600 mb-1 font-medium">다음 달 예상 매출액</div>
-            <div className="text-2xl font-bold text-blue-600">
-              {loadingExpectedRevenue ? (
-                <span className="text-sm">계산 중...</span>
-              ) : (
-                `${expectedRevenue.toLocaleString()}원`
-              )}
-            </div>
-            <div className="text-xs text-gray-500 mt-1">재학생 기준 예상</div>
-          </div>
-        )}
         <div className="bg-white border rounded-lg p-4">
           <div className="text-sm text-gray-500 mb-1">결제액</div>
           <div className="text-2xl font-bold text-green-600">
