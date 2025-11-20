@@ -524,9 +524,19 @@ export default function PaymentsPage() {
   };
 
   // 해당 달의 결제만 필터링 (표시용, 전체 기간이 아닐 때만)
+  // 환불 금액 필터 사용 시 마지막 수업일이 선택된 달에 있는 그만둔 학생의 모든 결제 표시
   const currentMonthPayments = showAllPeriod
     ? payments.filter(p => p.status !== 'cancelled')
     : payments.filter(p => {
+        // 환불 금액 필터 사용 시: 마지막 수업일이 선택된 달에 있는 그만둔 학생의 모든 결제 표시
+        if (paymentFilter === 'refund' && p.student_status === 'inactive' && p.student_last_class_date) {
+          const [selectedYear, selectedMonthNum] = selectedMonth.split('-').map(Number);
+          const lastClassDate = new Date(p.student_last_class_date);
+          return lastClassDate.getFullYear() === selectedYear &&
+                 lastClassDate.getMonth() + 1 === selectedMonthNum &&
+                 p.status !== 'cancelled';
+        }
+        // 일반 필터: 해당 달의 결제만
         const [year, month] = selectedMonth.split('-').map(Number);
         const paymentDate = new Date(p.payment_date);
         const paymentMonth = paymentDate.getMonth() + 1;
