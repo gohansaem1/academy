@@ -65,27 +65,24 @@ function StudentDetailContent() {
 
       if (error) throw error;
       
-      // 마지막 수업일 이후 자동으로 그만둔 상태로 변경
-      const { shouldUpdateStudentStatus } = await import('@/lib/utils/student-status');
-      if (shouldUpdateStudentStatus(data.status, data.last_class_date)) {
-        const { error: updateError } = await supabase
+      // 마지막 수업일이 현재 날짜보다 이전이면 자동으로 그만둔 상태로 변경
+      const { autoUpdateStudentStatusIfNeeded } = await import('@/lib/utils/student-status');
+      const statusUpdated = await autoUpdateStudentStatusIfNeeded(
+        id,
+        data.status,
+        data.last_class_date
+      );
+      
+      if (statusUpdated) {
+        // 업데이트 후 다시 조회
+        const { data: updatedData, error: updatedError } = await supabase
           .from('students')
-          .update({ status: 'inactive' })
-          .eq('id', id);
+          .select('*')
+          .eq('id', id)
+          .single();
         
-        if (!updateError) {
-          // 업데이트 후 다시 조회
-          const { data: updatedData, error: updatedError } = await supabase
-            .from('students')
-            .select('*')
-            .eq('id', id)
-            .single();
-          
-          if (!updatedError) {
-            setStudent(updatedData);
-          } else {
-            setStudent(data);
-          }
+        if (!updatedError) {
+          setStudent(updatedData);
         } else {
           setStudent(data);
         }
