@@ -713,7 +713,12 @@ export default function PaymentsPage() {
     };
   };
 
-  const statistics = calculateStatistics();
+  // 통계 계산 useEffect
+  useEffect(() => {
+    if (payments.length > 0 || showAllPeriod) {
+      calculateStatistics().then(setStatistics).catch(console.error);
+    }
+  }, [payments, selectedMonth, showAllPeriod]);
 
   return (
     <div>
