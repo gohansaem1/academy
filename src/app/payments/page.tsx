@@ -109,7 +109,7 @@ export default function PaymentsPage() {
   );
 
   const totalAmount = filteredPayments
-    .filter(p => p.status === 'completed')
+    .filter(p => p.status === 'completed' || p.status === 'confirmed')
     .reduce((sum, p) => sum + p.amount, 0);
 
   return (
