@@ -21,6 +21,7 @@ export default function NewStudentPage() {
     guardian_phone: '',
     payment_due_day: 25, // 기본값: 25일
     status: 'active', // 기본값: 재학
+    first_class_date: new Date().toISOString().split('T')[0], // 기본값: 오늘
   });
   const [errors, setErrors] = useState<Partial<Record<keyof StudentFormData, string>>>({});
 
@@ -80,6 +81,7 @@ export default function NewStudentPage() {
           guardian_phone: formData.guardian_phone,
           payment_due_day: formData.payment_due_day || null,
           status: formData.status || 'active',
+          first_class_date: formData.first_class_date || null,
         }]);
 
       if (error) throw error;
@@ -167,6 +169,20 @@ export default function NewStudentPage() {
             error={errors.payment_due_day}
           />
           <p className="mt-1 text-sm text-gray-500">매월 결제일을 입력하세요 (1-31일)</p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1 text-gray-700">
+            첫 수업일
+          </label>
+          <Input
+            type="date"
+            value={formData.first_class_date || ''}
+            onChange={(e) => setFormData({ ...formData, first_class_date: e.target.value })}
+            error={errors.first_class_date}
+            required
+          />
+          <p className="mt-1 text-sm text-gray-500">학생의 첫 수업일을 입력하세요</p>
         </div>
 
         <div>

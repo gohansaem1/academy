@@ -48,6 +48,7 @@ export default function EditStudentPage() {
         guardian_phone: data.guardian_phone,
         payment_due_day: data.payment_due_day || undefined,
         status: data.status || 'active',
+        first_class_date: data.first_class_date || undefined,
       });
     } catch (error) {
       console.error('학생 조회 오류:', error);
@@ -100,7 +101,7 @@ export default function EditStudentPage() {
         .eq('id', params.id)
         .single();
       
-      let updateData: any = {
+      const updateData: any = {
         name: formData.name,
         phone: formData.phone,
         email: formData.email || null,
@@ -109,6 +110,7 @@ export default function EditStudentPage() {
         guardian_phone: formData.guardian_phone,
         payment_due_day: formData.payment_due_day || null,
         status: formData.status || 'active',
+        first_class_date: formData.first_class_date || null,
       };
       
       // 그만둔 상태로 변경할 때 마지막 수업일자 기록
@@ -125,11 +127,65 @@ export default function EditStudentPage() {
           .limit(1)
           .single();
         
-        if (lastAttendance) {
-          updateData.last_class_date = lastAttendance.date;
-        } else {
-          // 출석 기록이 없으면 오늘 날짜로 설정
-          updateData.last_class_date = new Date().toISOString().split('T')[0];
+        const lastClassDate = lastAttendance 
+          ? lastAttendance.date 
+          : new Date().toISOString().split('T')[0];
+        
+        updateData.last_class_date = lastClassDate;
+        
+        // 환불 계산 및 처리
+        const { calculateRefundAmount } = await import('@/lib/utils/tuition');
+        
+        // 학생이 등록한 모든 수업 조회
+        const { data: enrollments, error: enrollmentsError } = await supabase
+          .from('course_enrollments')
+          .select(`
+            course_id,
+            courses(tuition_fee, schedule)
+          `)
+          .eq('student_id', params.id);
+        
+        if (!enrollmentsError && enrollments && enrollments.length > 0) {
+          const today = new Date();
+          const currentYear = today.getFullYear();
+          const currentMonth = today.getMonth() + 1;
+          const lastClassDateObj = new Date(lastClassDate);
+          
+          // 각 수업에 대해 환불 계산
+          for (const enrollment of enrollments) {
+            const course = enrollment.courses as any;
+            if (!course) continue;
+            
+            const schedule = course.schedule 
+              ? (typeof course.schedule === 'string' 
+                  ? JSON.parse(course.schedule) 
+                  : course.schedule)
+              : [];
+            
+            if (schedule.length > 0) {
+              const refundAmount = calculateRefundAmount(
+                course.tuition_fee,
+                schedule,
+                lastClassDateObj,
+                currentYear,
+                currentMonth
+              );
+              
+              // 환불 금액이 있으면 환불 결제 항목 생성
+              if (refundAmount > 0) {
+                await supabase
+                  .from('payments')
+                  .insert([{
+                    student_id: params.id,
+                    course_id: enrollment.course_id,
+                    amount: refundAmount,
+                    payment_method: 'transfer', // 환불은 계좌이체로
+                    payment_date: today.toISOString().split('T')[0],
+                    status: 'cancelled', // 환불은 취소 상태로 표시
+                  }]);
+              }
+            }
+          }
         }
       } else if (newStatus === 'active' && oldStatus === 'inactive') {
         // 재학으로 변경할 때는 마지막 수업일자 초기화
@@ -230,6 +286,19 @@ export default function EditStudentPage() {
             error={errors.payment_due_day}
           />
           <p className="mt-1 text-sm text-gray-500">매월 결제일을 입력하세요 (1-31일)</p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1 text-gray-700">
+            첫 수업일
+          </label>
+          <Input
+            type="date"
+            value={formData.first_class_date || ''}
+            onChange={(e) => setFormData({ ...formData, first_class_date: e.target.value })}
+            error={errors.first_class_date}
+          />
+          <p className="mt-1 text-sm text-gray-500">학생의 첫 수업일을 입력하세요</p>
         </div>
 
         <div>

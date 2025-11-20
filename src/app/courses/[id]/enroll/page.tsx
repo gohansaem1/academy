@@ -57,19 +57,19 @@ export default function EnrollStudentPage() {
 
   const handleEnroll = async (studentId: string) => {
     try {
-      // 수업 정보 조회
+      // 수업 정보 조회 (스케줄 포함)
       const { data: courseData, error: courseError } = await supabase
         .from('courses')
-        .select('tuition_fee')
+        .select('tuition_fee, schedule')
         .eq('id', params.id)
         .single();
 
       if (courseError) throw courseError;
 
-      // 학생 정보 조회 (결제일 확인)
+      // 학생 정보 조회 (결제일, 첫 수업일 확인)
       const { data: studentData, error: studentError } = await supabase
         .from('students')
-        .select('payment_due_day')
+        .select('payment_due_day, first_class_date')
         .eq('id', studentId)
         .single();
 
@@ -92,23 +92,51 @@ export default function EnrollStudentPage() {
         return;
       }
 
-      // 결제일 계산 (학생의 payment_due_day 사용, 없으면 현재 달의 25일)
+      // 첫 수업일 기준으로 해당 달 남은 수업 금액 계산
       const today = new Date();
+      const firstClassDate = studentData.first_class_date 
+        ? new Date(studentData.first_class_date) 
+        : today;
+      
+      const currentYear = today.getFullYear();
+      const currentMonth = today.getMonth() + 1;
+      
+      // 수업 스케줄 파싱
+      const schedule = courseData.schedule 
+        ? (typeof courseData.schedule === 'string' 
+            ? JSON.parse(courseData.schedule) 
+            : courseData.schedule)
+        : [];
+      
+      // 해당 달 남은 수업 금액 계산
+      let paymentAmount = courseData.tuition_fee;
+      if (schedule.length > 0 && firstClassDate) {
+        const { calculateProportionalTuition } = await import('@/lib/utils/tuition');
+        paymentAmount = calculateProportionalTuition(
+          courseData.tuition_fee,
+          schedule,
+          firstClassDate,
+          currentYear,
+          currentMonth
+        );
+      }
+
+      // 결제일 계산 (학생의 payment_due_day 사용, 없으면 현재 달의 25일)
       const dueDay = studentData.payment_due_day || 25;
-      const paymentDate = new Date(today.getFullYear(), today.getMonth(), dueDay);
+      const paymentDate = new Date(currentYear, currentMonth - 1, dueDay);
       
       // 결제일이 이미 지났으면 다음 달로 설정
       if (paymentDate < today) {
         paymentDate.setMonth(paymentDate.getMonth() + 1);
       }
 
-      // 결제 항목 자동 생성
+      // 결제 항목 자동 생성 (해당 달 남은 수업 금액)
       const { error: paymentError } = await supabase
         .from('payments')
         .insert([{
           student_id: studentId,
           course_id: params.id as string,
-          amount: courseData.tuition_fee,
+          amount: paymentAmount,
           payment_method: 'card', // 기본값: 카드
           payment_date: paymentDate.toISOString().split('T')[0],
           status: 'pending', // 기본값: 미납

@@ -318,7 +318,7 @@ function StudentDetailContent() {
                 try {
                   let updateData: { status: string; last_class_date?: string | null } = { status: newStatus };
                   
-                  // 그만둔 상태로 변경할 때 마지막 수업일자 기록
+                  // 그만둔 상태로 변경할 때 마지막 수업일자 기록 및 환불 계산
                   if (newStatus === 'inactive') {
                     // 학생의 마지막 출석일 조회
                     const { data: lastAttendance, error: attendanceError } = await supabase
@@ -329,11 +329,65 @@ function StudentDetailContent() {
                       .limit(1)
                       .single();
                     
-                    if (!attendanceError && lastAttendance) {
-                      updateData.last_class_date = lastAttendance.date;
-                    } else {
-                      // 출석 기록이 없으면 오늘 날짜로 설정
-                      updateData.last_class_date = new Date().toISOString().split('T')[0];
+                    const lastClassDate = (!attendanceError && lastAttendance) 
+                      ? lastAttendance.date 
+                      : new Date().toISOString().split('T')[0];
+                    
+                    updateData.last_class_date = lastClassDate;
+                    
+                    // 환불 계산 및 처리
+                    const { calculateRefundAmount } = await import('@/lib/utils/tuition');
+                    
+                    // 학생이 등록한 모든 수업 조회
+                    const { data: enrollments, error: enrollmentsError } = await supabase
+                      .from('course_enrollments')
+                      .select(`
+                        course_id,
+                        courses(tuition_fee, schedule)
+                      `)
+                      .eq('student_id', params.id);
+                    
+                    if (!enrollmentsError && enrollments && enrollments.length > 0) {
+                      const today = new Date();
+                      const currentYear = today.getFullYear();
+                      const currentMonth = today.getMonth() + 1;
+                      const lastClassDateObj = new Date(lastClassDate);
+                      
+                      // 각 수업에 대해 환불 계산
+                      for (const enrollment of enrollments) {
+                        const course = enrollment.courses as any;
+                        if (!course) continue;
+                        
+                        const schedule = course.schedule 
+                          ? (typeof course.schedule === 'string' 
+                              ? JSON.parse(course.schedule) 
+                              : course.schedule)
+                          : [];
+                        
+                        if (schedule.length > 0) {
+                          const refundAmount = calculateRefundAmount(
+                            course.tuition_fee,
+                            schedule,
+                            lastClassDateObj,
+                            currentYear,
+                            currentMonth
+                          );
+                          
+                          // 환불 금액이 있으면 환불 결제 항목 생성
+                          if (refundAmount > 0) {
+                            await supabase
+                              .from('payments')
+                              .insert([{
+                                student_id: params.id,
+                                course_id: enrollment.course_id,
+                                amount: refundAmount,
+                                payment_method: 'transfer', // 환불은 계좌이체로
+                                payment_date: today.toISOString().split('T')[0],
+                                status: 'cancelled', // 환불은 취소 상태로 표시
+                              }]);
+                          }
+                        }
+                      }
                     }
                   } else {
                     // 재학으로 변경할 때는 마지막 수업일자 초기화
@@ -347,7 +401,7 @@ function StudentDetailContent() {
                   
                   if (error) throw error;
                   fetchStudent(params.id as string);
-                  alert(`학생 상태가 ${newStatus === 'active' ? '재학' : '그만둔'}으로 변경되었습니다.`);
+                  alert(`학생 상태가 ${newStatus === 'active' ? '재학' : '그만둔'}으로 변경되었습니다.${newStatus === 'inactive' ? ' 환불 항목이 생성되었습니다.' : ''}`);
                 } catch (error) {
                   console.error('상태 변경 오류:', error);
                   alert('상태 변경 중 오류가 발생했습니다.');
@@ -387,6 +441,15 @@ function StudentDetailContent() {
           <label className="text-sm font-medium text-gray-500">보호자 전화번호</label>
           <p className="text-lg mt-1">{student.guardian_phone}</p>
         </div>
+
+        {student.first_class_date && (
+          <div>
+            <label className="text-sm font-medium text-gray-500">첫 수업일</label>
+            <p className="text-lg mt-1">
+              {new Date(student.first_class_date).toLocaleDateString('ko-KR')}
+            </p>
+          </div>
+        )}
 
         {student.status === 'inactive' && student.last_class_date && (
           <div>

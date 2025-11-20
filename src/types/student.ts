@@ -8,6 +8,7 @@ export interface Student {
   guardian_phone: string;
   payment_due_day?: number | null; // 매월 결제일 (1-31)
   status?: 'active' | 'inactive'; // 학생 상태 (active: 재학, inactive: 그만둠)
+  first_class_date?: string | null; // 첫 수업일자
   last_class_date?: string | null; // 마지막 수업일자
   created_at: string;
   updated_at: string;
@@ -22,5 +23,6 @@ export interface StudentFormData {
   guardian_phone: string;
   payment_due_day?: number; // 매월 결제일 (1-31)
   status?: 'active' | 'inactive'; // 학생 상태
+  first_class_date?: string; // 첫 수업일자
 }
 
