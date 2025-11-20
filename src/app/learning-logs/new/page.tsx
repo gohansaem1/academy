@@ -28,19 +28,21 @@ function NewLearningLogContent() {
   const [errors, setErrors] = useState<Partial<Record<keyof LearningLogFormData, string>>>({});
 
   useEffect(() => {
-    fetchCourses();
-    fetchInstructors();
-  }, []);
+    if (!authLoading) {
+      fetchCourses();
+      fetchInstructors();
+    }
+  }, [authLoading]);
 
   useEffect(() => {
-    if (formData.course_id) {
+    if (!authLoading && formData.course_id) {
       const selectedCourse = courses.find(c => c.id === formData.course_id);
       if (selectedCourse) {
         // 선택된 수업의 강사 ID를 자동으로 설정할 수 있지만, 
         // 현재는 수동 선택으로 두겠습니다.
       }
     }
-  }, [formData.course_id, courses]);
+  }, [formData.course_id, courses, authLoading]);
 
   if (authLoading) {
     return (

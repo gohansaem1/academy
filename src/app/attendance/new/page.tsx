@@ -24,6 +24,20 @@ export default function NewAttendancePage() {
   });
   const [errors, setErrors] = useState<Partial<Record<keyof AttendanceFormData, string>>>({});
 
+  useEffect(() => {
+    if (!authLoading) {
+      fetchCourses();
+    }
+  }, [authLoading]);
+
+  useEffect(() => {
+    if (!authLoading && formData.course_id) {
+      fetchEnrolledStudents(formData.course_id);
+    } else if (!authLoading) {
+      setStudents([]);
+    }
+  }, [formData.course_id, authLoading]);
+
   if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -34,18 +48,6 @@ export default function NewAttendancePage() {
       </div>
     );
   }
-
-  useEffect(() => {
-    fetchCourses();
-  }, []);
-
-  useEffect(() => {
-    if (formData.course_id) {
-      fetchEnrolledStudents(formData.course_id);
-    } else {
-      setStudents([]);
-    }
-  }, [formData.course_id]);
 
   const fetchCourses = async () => {
     try {

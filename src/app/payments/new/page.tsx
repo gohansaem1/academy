@@ -31,6 +31,22 @@ export default function NewPaymentPage() {
     status: 'pending',
   });
   const [errors, setErrors] = useState<Partial<Record<keyof PaymentFormData, string>>>({});
+
+  useEffect(() => {
+    if (!authLoading) {
+      fetchCourses();
+      fetchStudents();
+    }
+  }, [authLoading]);
+
+  useEffect(() => {
+    if (!authLoading && formData.course_id) {
+      const selectedCourse = courses.find(c => c.id === formData.course_id);
+      if (selectedCourse) {
+        setFormData({ ...formData, amount: selectedCourse.tuition_fee });
+      }
+    }
+  }, [formData.course_id, authLoading]);
   
   if (authLoading) {
     return (
@@ -42,20 +58,6 @@ export default function NewPaymentPage() {
       </div>
     );
   }
-
-  useEffect(() => {
-    fetchCourses();
-    fetchStudents();
-  }, []);
-
-  useEffect(() => {
-    if (formData.course_id) {
-      const selectedCourse = courses.find(c => c.id === formData.course_id);
-      if (selectedCourse) {
-        setFormData({ ...formData, amount: selectedCourse.tuition_fee });
-      }
-    }
-  }, [formData.course_id]);
 
   const fetchCourses = async () => {
     try {
