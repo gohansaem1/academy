@@ -226,8 +226,8 @@ export default function NewCoursePage() {
         </div>
 
         <div className="flex gap-2 pt-4">
-          <Button type="submit" disabled={loading}>
-            {loading ? '등록 중...' : '등록'}
+          <Button type="submit" disabled={saving}>
+            {saving ? '등록 중...' : '등록'}
           </Button>
           <Button
             type="button"
