@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase/client';
 import Input from '@/components/common/Input';
 import Button from '@/components/common/Button';
+
+const REMEMBERED_EMAIL_KEY = 'remembered_email';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -13,8 +15,18 @@ export default function LoginPage() {
     email: '',
     password: '',
   });
+  const [rememberEmail, setRememberEmail] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    // 저장된 이메일 불러오기
+    const rememberedEmail = localStorage.getItem(REMEMBERED_EMAIL_KEY);
+    if (rememberedEmail) {
+      setFormData(prev => ({ ...prev, email: rememberedEmail }));
+      setRememberEmail(true);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,6 +83,13 @@ export default function LoginPage() {
           localStorage.setItem('user', JSON.stringify(userData));
         }
 
+        // 이메일 기억하기 처리
+        if (rememberEmail) {
+          localStorage.setItem(REMEMBERED_EMAIL_KEY, formData.email);
+        } else {
+          localStorage.removeItem(REMEMBERED_EMAIL_KEY);
+        }
+
         // 초기 비밀번호(0000)인 경우 비밀번호 변경 페이지로 리다이렉트
         if (formData.password === '0000' && userData?.role === 'ADMIN') {
           router.push('/profile/change-password?initial=true');
@@ -124,6 +143,19 @@ export default function LoginPage() {
           required
           autoComplete="current-password"
         />
+
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            id="remember-email"
+            checked={rememberEmail}
+            onChange={(e) => setRememberEmail(e.target.checked)}
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+          />
+          <label htmlFor="remember-email" className="ml-2 block text-sm text-gray-700">
+            이메일 기억하기
+          </label>
+        </div>
 
         <Button type="submit" disabled={loading} className="w-full">
           {loading ? '로그인 중...' : '로그인'}
