@@ -35,8 +35,12 @@ interface PaymentWithDueStatus extends Payment {
   dueStatus?: PaymentDueStatus;
 }
 
+interface PaymentWithStudent extends Payment {
+  student_payment_due_day?: number | null;
+}
+
 export default function PaymentsPage() {
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const [payments, setPayments] = useState<PaymentWithStudent[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
@@ -44,6 +48,7 @@ export default function PaymentsPage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
   const [selectedPayments, setSelectedPayments] = useState<Set<string>>(new Set());
+  const [editingPayments, setEditingPayments] = useState<Record<string, { payment_method?: string; payment_date?: string; status?: string }>>({});
 
   useEffect(() => {
     fetchPayments();
@@ -58,12 +63,12 @@ export default function PaymentsPage() {
       const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
       const endDate = new Date(year, month, 0).toISOString().split('T')[0];
 
-      // 해당 달의 결제 데이터 조회
+      // 해당 달의 결제 데이터 조회 (학생의 결제일 정보 포함)
       const { data, error } = await supabase
         .from('payments')
         .select(`
           *,
-          students(name),
+          students(name, payment_due_day),
           courses(name)
         `)
         .gte('payment_date', startDate)
@@ -80,7 +85,7 @@ export default function PaymentsPage() {
         .from('payments')
         .select(`
           *,
-          students(name),
+          students(name, payment_due_day),
           courses(name)
         `)
         .lt('payment_date', currentMonthStart); // 현재 달 이전의 모든 결제
@@ -92,6 +97,7 @@ export default function PaymentsPage() {
       const paymentsWithNames = (data || []).map((payment: any) => ({
         ...payment,
         student_name: payment.students?.name,
+        student_payment_due_day: payment.students?.payment_due_day,
         course_name: payment.courses?.name,
       }));
 
@@ -101,6 +107,7 @@ export default function PaymentsPage() {
         ...((previousPaymentsData || []).map((payment: any) => ({
           ...payment,
           student_name: payment.students?.name,
+          student_payment_due_day: payment.students?.payment_due_day,
           course_name: payment.courses?.name,
         })))
       ];
@@ -252,6 +259,53 @@ export default function PaymentsPage() {
       console.error('일괄 확인 오류:', error);
       alert('결제 확인 중 오류가 발생했습니다.');
     }
+  };
+
+  const handleEditPayment = (paymentId: string, field: 'payment_method' | 'payment_date' | 'status', value: string) => {
+    setEditingPayments(prev => ({
+      ...prev,
+      [paymentId]: {
+        ...prev[paymentId],
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleSavePayment = async (paymentId: string) => {
+    const edits = editingPayments[paymentId];
+    if (!edits || Object.keys(edits).length === 0) return;
+
+    try {
+      const updateData: any = {};
+      if (edits.payment_method !== undefined) updateData.payment_method = edits.payment_method;
+      if (edits.payment_date !== undefined) updateData.payment_date = edits.payment_date;
+      if (edits.status !== undefined) updateData.status = edits.status;
+
+      const { error } = await supabase
+        .from('payments')
+        .update(updateData)
+        .eq('id', paymentId);
+
+      if (error) throw error;
+
+      // 편집 상태 초기화
+      setEditingPayments(prev => {
+        const newState = { ...prev };
+        delete newState[paymentId];
+        return newState;
+      });
+
+      fetchPayments();
+    } catch (error) {
+      console.error('결제 수정 오류:', error);
+      alert('결제 수정 중 오류가 발생했습니다.');
+    }
+  };
+
+  const getDefaultPaymentDate = (payment: PaymentWithStudent): string => {
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const dueDay = payment.student_payment_due_day || 25;
+    return `${year}-${String(month).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`;
   };
 
   // 해당 달의 결제만 필터링 (표시용)
@@ -431,7 +485,7 @@ export default function PaymentsPage() {
                 <TableHead>결제 금액</TableHead>
                 <TableHead>결제 방법</TableHead>
                 <TableHead>결제일</TableHead>
-                <TableHead>상태</TableHead>
+                <TableHead>확인 여부</TableHead>
                 <TableHead className="text-right">작업</TableHead>
               </TableRow>
             </TableHeader>
@@ -460,25 +514,54 @@ export default function PaymentsPage() {
                     </TableCell>
                     <TableCell>{payment.course_name || '-'}</TableCell>
                     <TableCell>{payment.amount.toLocaleString()}원</TableCell>
-                    <TableCell>{PAYMENT_METHODS[payment.payment_method]}</TableCell>
                     <TableCell>
-                      {new Date(payment.payment_date).toLocaleDateString('ko-KR')}
+                      <select
+                        value={editingPayments[payment.id]?.payment_method !== undefined 
+                          ? editingPayments[payment.id].payment_method 
+                          : (payment.payment_method || 'card')}
+                        onChange={(e) => {
+                          handleEditPayment(payment.id, 'payment_method', e.target.value);
+                          handleSavePayment(payment.id);
+                        }}
+                        className="flex h-8 w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                      >
+                        <option value="card">카드</option>
+                        <option value="cash">현금</option>
+                        <option value="transfer">계좌이체</option>
+                      </select>
                     </TableCell>
                     <TableCell>
-                      <span className={`px-2 py-1 rounded text-sm ${statusColor}`}>
-                        {statusLabel}
-                      </span>
+                      <Input
+                        type="date"
+                        value={editingPayments[payment.id]?.payment_date !== undefined
+                          ? editingPayments[payment.id].payment_date!
+                          : (payment.payment_date || getDefaultPaymentDate(payment))}
+                        onChange={(e) => handleEditPayment(payment.id, 'payment_date', e.target.value)}
+                        onBlur={() => handleSavePayment(payment.id)}
+                        className="w-40"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={editingPayments[payment.id]?.status !== undefined
+                            ? (editingPayments[payment.id].status === 'confirmed' || editingPayments[payment.id].status === 'completed')
+                            : (payment.status === 'confirmed' || payment.status === 'completed')}
+                          onChange={(e) => {
+                            const newStatus = e.target.checked ? 'confirmed' : 'pending';
+                            handleEditPayment(payment.id, 'status', newStatus);
+                            handleSavePayment(payment.id);
+                          }}
+                          className="w-4 h-4"
+                        />
+                        <span className={`px-2 py-1 rounded text-sm ${statusColor}`}>
+                          {statusLabel}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        {(payment.status === 'pending' || payment.status === 'completed') && (
-                          <Button
-                            size="sm"
-                            onClick={() => handleConfirm(payment.id)}
-                          >
-                            확인
-                          </Button>
-                        )}
                         {(payment.status === 'pending' || payment.status === 'completed') && (
                           <Button
                             variant="destructive"
