@@ -1,0 +1,51 @@
+-- 초기 관리자 계정 생성
+-- 주의: 이 스크립트는 Supabase SQL Editor에서 실행하기 전에
+-- 먼저 Supabase Auth에서 수동으로 사용자를 생성해야 합니다.
+
+-- 1단계: Supabase Dashboard > Authentication > Users에서 수동으로 사용자 생성
+-- - Email: admin@academy.local (또는 원하는 이메일)
+-- - Password: 0000
+-- - Email Confirmed: true로 설정
+-- 생성 후 사용자 ID를 복사합니다.
+
+-- 2단계: 아래 SQL을 실행하여 users 테이블에 관리자 정보 추가
+-- 주의: {USER_ID_HERE}를 실제 생성된 사용자 ID로 교체하세요.
+
+-- 예시 (실제 사용자 ID로 교체 필요):
+-- INSERT INTO users (id, name, role, email, phone, status)
+-- VALUES (
+--   '실제-사용자-UUID-여기에-입력',
+--   '관리자',
+--   'ADMIN',
+--   'admin@academy.local',
+--   '010-0000-0000',
+--   'active'
+-- )
+-- ON CONFLICT (id) DO NOTHING;
+
+-- 또는 Supabase Auth의 admin@academy.local 사용자 ID를 확인한 후:
+-- DO $$
+-- DECLARE
+--   admin_user_id UUID;
+-- BEGIN
+--   -- auth.users에서 admin@academy.local 사용자 ID 조회
+--   SELECT id INTO admin_user_id
+--   FROM auth.users
+--   WHERE email = 'admin@academy.local'
+--   LIMIT 1;
+--
+--   -- users 테이블에 관리자 정보 추가
+--   IF admin_user_id IS NOT NULL THEN
+--     INSERT INTO users (id, name, role, email, phone, status)
+--     VALUES (
+--       admin_user_id,
+--       '관리자',
+--       'ADMIN',
+--       'admin@academy.local',
+--       '010-0000-0000',
+--       'active'
+--     )
+--     ON CONFLICT (id) DO NOTHING;
+--   END IF;
+-- END $$;
+

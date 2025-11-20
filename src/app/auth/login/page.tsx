@@ -46,7 +46,12 @@ export default function LoginPage() {
           localStorage.setItem('user', JSON.stringify(userData));
         }
 
-        router.push('/');
+        // 초기 비밀번호(0000)인 경우 비밀번호 변경 페이지로 리다이렉트
+        if (formData.password === '0000' && userData?.role === 'ADMIN') {
+          router.push('/profile/change-password?initial=true');
+        } else {
+          router.push('/');
+        }
         router.refresh();
       }
     } catch (error: any) {
