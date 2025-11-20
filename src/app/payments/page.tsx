@@ -287,6 +287,10 @@ export default function PaymentsPage() {
               ...payment,
               student_name: payment.students?.name,
               student_payment_due_day: payment.students?.payment_due_day,
+              student_first_class_date: payment.students?.first_class_date,
+              student_last_class_date: payment.students?.last_class_date,
+              student_status: payment.students?.status,
+              course_tuition_fee: payment.courses?.tuition_fee,
               course_name: payment.courses?.name,
             })))
           ];
