@@ -109,7 +109,7 @@ END $$;
 DO $$
 DECLARE
   student_record RECORD;
-  last_class_date DATE;
+  last_class_date_val DATE;
   current_date DATE := CURRENT_DATE;
   one_month_ago DATE := CURRENT_DATE - INTERVAL '1 month';
   two_months_ago DATE := CURRENT_DATE - INTERVAL '2 months';
@@ -122,11 +122,11 @@ BEGIN
     LIMIT 10
   LOOP
     -- 마지막 수업일: 1-2개월 전 랜덤
-    last_class_date := two_months_ago + (RANDOM() * (one_month_ago - two_months_ago))::INTEGER;
+    last_class_date_val := two_months_ago + (RANDOM() * (one_month_ago - two_months_ago))::INTEGER;
     
     UPDATE students
     SET status = 'inactive',
-        last_class_date = last_class_date
+        last_class_date = last_class_date_val
     WHERE id = student_record.id;
   END LOOP;
 END $$;
