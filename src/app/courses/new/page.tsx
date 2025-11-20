@@ -5,15 +5,29 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { CourseFormData } from '@/types/course';
 import { Instructor } from '@/types/instructor';
+import { useAuth } from '@/hooks/useAuth';
 import Button from '@/components/common/Button';
 import Input from '@/components/common/Input';
 
 const DAYS_OF_WEEK = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
 
 export default function NewCoursePage() {
+  const { user, loading: authLoading } = useAuth('ADMIN');
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [instructors, setInstructors] = useState<Instructor[]>([]);
+  
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
+
   const [formData, setFormData] = useState<CourseFormData>({
     name: '',
     subject: '',

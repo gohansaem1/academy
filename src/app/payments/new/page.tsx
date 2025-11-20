@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase/client';
 import { Course } from '@/types/course';
 import { Student } from '@/types/student';
 import { PaymentFormData } from '@/types/payment';
+import { useAuth } from '@/hooks/useAuth';
 import Button from '@/components/common/Button';
 import Input from '@/components/common/Input';
 
@@ -16,6 +17,7 @@ const PAYMENT_METHODS = {
 };
 
 export default function NewPaymentPage() {
+  const { user, loading: authLoading } = useAuth('ADMIN');
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [courses, setCourses] = useState<Course[]>([]);
