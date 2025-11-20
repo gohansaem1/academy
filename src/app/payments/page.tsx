@@ -640,11 +640,11 @@ export default function PaymentsPage() {
     // 순매출액 (총 매출액 - 환불 금액)
     const netRevenue = totalRevenue - totalRefundAmount;
 
-    // 결제액 (완료/확인된 결제 금액 합계)
-    // 환불 금액은 별도로 계산되므로 결제액에서는 차감하지 않음
+    // 결제액 (완료/확인된 결제 금액 합계 - 환불 금액)
+    // 환불 금액을 마이너스 결제로 포함
     const paidAmount = paymentsForStats
       .filter(p => p.status === 'completed' || p.status === 'confirmed')
-      .reduce((sum, p) => sum + p.amount, 0);
+      .reduce((sum, p) => sum + p.amount, 0) - totalRefundAmount;
 
     // 미납액 (결제일이 지났지만 아직 완료되지 않은 결제, 또는 상태가 pending인 결제)
     const overdueAmount = paymentsForStats
