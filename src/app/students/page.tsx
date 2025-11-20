@@ -112,9 +112,6 @@ export default function StudentsPage() {
                       <Link href={`/students/${student.id}`}>
                         <Button variant="outline" size="sm">상세</Button>
                       </Link>
-                      <Link href={`/students/${student.id}?tab=attendance`}>
-                        <Button variant="outline" size="sm">출석보기</Button>
-                      </Link>
                       <Button
                         variant="destructive"
                         size="sm"
