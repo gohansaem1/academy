@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "학원 관리 시스템",
+  title: "펀빌리티 영어미술",
   description: "학원의 학생, 강사, 수업, 수강료 등을 효율적으로 관리할 수 있는 웹 애플리케이션",
 };
 
