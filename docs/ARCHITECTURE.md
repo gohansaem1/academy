@@ -51,6 +51,16 @@ academy/
 │   │   ├── courses/                 # 수업 관리 페이지
 │   │   ├── attendance/              # 출석 관리 페이지
 │   │   ├── payments/                # 수강료 관리 페이지
+│   │   ├── admin/                   # 관리자 페이지
+│   │   │   ├── dashboard/          # 대시보드
+│   │   │   └── statistics/         # 통계 페이지
+│   │   │       ├── students/      # 수강생 통계
+│   │   │       ├── courses/       # 수업 통계
+│   │   │       ├── payments/      # 수강료 통계
+│   │   │       ├── attendance/    # 출석 통계
+│   │   │       ├── instructors/   # 강사 통계
+│   │   │       ├── revenue/       # 매출 분석
+│   │   │       └── kpi/           # 경영 지표
 │   │   └── api/                     # API Routes
 │   │       ├── students/
 │   │       ├── instructors/
@@ -72,7 +82,12 @@ academy/
 │   │       ├── instructors/
 │   │       ├── courses/
 │   │       ├── attendance/
-│   │       └── payments/
+│   │       ├── payments/
+│   │       └── admin/              # 관리자 기능 컴포넌트
+│   │           ├── dashboard/      # 대시보드 컴포넌트
+│   │           └── statistics/     # 통계 컴포넌트
+│   │               ├── charts/     # 차트 컴포넌트
+│   │               └── tables/      # 통계 테이블 컴포넌트
 │   ├── lib/                         # 유틸리티 및 헬퍼 함수
 │   │   ├── supabase/               # Supabase 클라이언트
 │   │   │   ├── client.ts          # 클라이언트 컴포넌트용

@@ -636,9 +636,9 @@ Authorization: Bearer {token}
 
 **향후 API**: `GET /api/reports/student/[studentId]/pdf?month=2024-01`
 
-## 13. 관리자 대시보드 API 🔄
+## 13. 관리자 대시보드 및 경영자료 API 📊
 
-### 13.1 대시보드 데이터 조회
+### 13.1 대시보드 개요 데이터 조회
 
 **향후 API**: `GET /api/admin/dashboard`
 
@@ -647,24 +647,396 @@ Authorization: Bearer {token}
 {
   "success": true,
   "data": {
-    "totalStudents": 150,
-    "totalInstructors": 10,
-    "totalCourses": 25,
-    "monthlyRevenue": 15000000,
-    "attendanceRate": 92.5,
-    "recentActivities": [...]
+    "overview": {
+      "totalStudents": 150,
+      "totalInstructors": 10,
+      "totalCourses": 25,
+      "activeEnrollments": 320,
+      "monthlyRevenue": 15000000,
+      "monthlyRevenueGrowth": 5.2,
+      "attendanceRate": 92.5,
+      "attendanceRateGrowth": 2.1
+    },
+    "recentActivities": [
+      {
+        "type": "student_registered",
+        "message": "홍길동 학생이 등록되었습니다.",
+        "timestamp": "2024-01-15T10:30:00Z"
+      }
+    ],
+    "quickStats": {
+      "newStudentsThisMonth": 12,
+      "newCoursesThisMonth": 3,
+      "pendingPayments": 5,
+      "lowAttendanceStudents": 8
+    }
   }
 }
 ```
 
-### 13.2 통계 데이터 조회
+### 13.2 수강생 현황 통계
 
-**향후 API**: `GET /api/admin/analytics`
+**향후 API**: `GET /api/admin/statistics/students`
+
+#### Query Parameters
+- `startDate` (optional): 시작 날짜 (YYYY-MM-DD)
+- `endDate` (optional): 종료 날짜 (YYYY-MM-DD)
+- `groupBy` (optional): 그룹화 기준 (month, year, subject)
+
+#### 응답 예시
+```json
+{
+  "success": true,
+  "data": {
+    "total": 150,
+    "newStudents": {
+      "thisMonth": 12,
+      "lastMonth": 10,
+      "growth": 20.0
+    },
+    "dropoutStudents": {
+      "thisMonth": 2,
+      "lastMonth": 3,
+      "dropoutRate": 1.3
+    },
+    "trend": [
+      {
+        "period": "2024-01",
+        "new": 12,
+        "dropout": 2,
+        "net": 10
+      }
+    ],
+    "distribution": {
+      "bySubject": {
+        "수학": 45,
+        "영어": 38,
+        "국어": 32
+      },
+      "byAge": {
+        "초등": 60,
+        "중등": 55,
+        "고등": 35
+      }
+    },
+    "averageCoursesPerStudent": 2.1
+  }
+}
+```
+
+### 13.3 수업 현황 통계
+
+**향후 API**: `GET /api/admin/statistics/courses`
 
 #### Query Parameters
 - `startDate` (optional): 시작 날짜
 - `endDate` (optional): 종료 날짜
-- `type` (optional): 통계 유형 (revenue, attendance, enrollment)
+- `subject` (optional): 과목 필터
+
+#### 응답 예시
+```json
+{
+  "success": true,
+  "data": {
+    "total": 25,
+    "activeCourses": 23,
+    "averageEnrollment": 13.6,
+    "averageCapacity": 20,
+    "enrollmentRate": 68.0,
+    "bySubject": {
+      "수학": {
+        "count": 8,
+        "totalEnrollment": 120,
+        "averageEnrollment": 15.0
+      }
+    },
+    "byDayOfWeek": {
+      "월요일": 5,
+      "화요일": 4,
+      "수요일": 6
+    },
+    "byTimeSlot": {
+      "09:00-12:00": 8,
+      "13:00-16:00": 10,
+      "16:00-19:00": 7
+    },
+    "popularCourses": [
+      {
+        "courseId": "course-001",
+        "courseName": "수학 기초반",
+        "enrollment": 18,
+        "capacity": 20,
+        "enrollmentRate": 90.0
+      }
+    ]
+  }
+}
+```
+
+### 13.4 수강료 수납 통계
+
+**향후 API**: `GET /api/admin/statistics/payments`
+
+#### Query Parameters
+- `startDate` (optional): 시작 날짜
+- `endDate` (optional): 종료 날짜
+- `courseId` (optional): 수업 필터
+- `groupBy` (optional): 그룹화 기준 (month, year, course)
+
+#### 응답 예시
+```json
+{
+  "success": true,
+  "data": {
+    "totalRevenue": 15000000,
+    "thisMonth": {
+      "revenue": 15000000,
+      "lastMonth": 14200000,
+      "growth": 5.6
+    },
+    "byMonth": [
+      {
+        "month": "2024-01",
+        "revenue": 15000000,
+        "paidCount": 120,
+        "pendingCount": 5,
+        "cancelledCount": 2
+      }
+    ],
+    "byCourse": [
+      {
+        "courseId": "course-001",
+        "courseName": "수학 기초반",
+        "revenue": 3600000,
+        "paidCount": 18,
+        "pendingCount": 2
+      }
+    ],
+    "byPaymentMethod": {
+      "cash": 6000000,
+      "card": 5000000,
+      "transfer": 4000000
+    },
+    "pendingPayments": {
+      "count": 5,
+      "totalAmount": 750000,
+      "students": [
+        {
+          "studentId": "student-001",
+          "studentName": "홍길동",
+          "amount": 150000,
+          "dueDate": "2024-01-20"
+        }
+      ]
+    },
+    "collectionRate": 96.0
+  }
+}
+```
+
+### 13.5 출석률 통계
+
+**향후 API**: `GET /api/admin/statistics/attendance`
+
+#### Query Parameters
+- `startDate` (optional): 시작 날짜
+- `endDate` (optional): 종료 날짜
+- `courseId` (optional): 수업 필터
+- `studentId` (optional): 학생 필터
+
+#### 응답 예시
+```json
+{
+  "success": true,
+  "data": {
+    "overall": {
+      "attendanceRate": 92.5,
+      "totalSessions": 500,
+      "present": 450,
+      "late": 25,
+      "absent": 20,
+      "early": 5
+    },
+    "byMonth": [
+      {
+        "month": "2024-01",
+        "attendanceRate": 92.5,
+        "totalSessions": 500,
+        "present": 450,
+        "late": 25,
+        "absent": 20,
+        "early": 5
+      }
+    ],
+    "byCourse": [
+      {
+        "courseId": "course-001",
+        "courseName": "수학 기초반",
+        "attendanceRate": 95.0,
+        "totalSessions": 100,
+        "present": 90,
+        "late": 5,
+        "absent": 5
+      }
+    ],
+    "byStatus": {
+      "present": 450,
+      "late": 25,
+      "absent": 20,
+      "early": 5
+    },
+    "topStudents": [
+      {
+        "studentId": "student-001",
+        "studentName": "홍길동",
+        "attendanceRate": 100.0,
+        "totalSessions": 20,
+        "present": 20
+      }
+    ],
+    "lowAttendanceStudents": [
+      {
+        "studentId": "student-002",
+        "studentName": "김철수",
+        "attendanceRate": 70.0,
+        "totalSessions": 20,
+        "present": 14,
+        "absent": 6
+      }
+    ]
+  }
+}
+```
+
+### 13.6 강사별 통계
+
+**향후 API**: `GET /api/admin/statistics/instructors`
+
+#### Query Parameters
+- `instructorId` (optional): 강사 필터
+- `startDate` (optional): 시작 날짜
+- `endDate` (optional): 종료 날짜
+
+#### 응답 예시
+```json
+{
+  "success": true,
+  "data": {
+    "total": 10,
+    "instructors": [
+      {
+        "instructorId": "instructor-001",
+        "instructorName": "이선생",
+        "courses": 3,
+        "totalStudents": 45,
+        "averageAttendanceRate": 94.5,
+        "learningLogsCount": 36,
+        "revenue": 4500000
+      }
+    ],
+    "summary": {
+      "averageCoursesPerInstructor": 2.5,
+      "averageStudentsPerInstructor": 32.0,
+      "averageAttendanceRate": 92.5
+    }
+  }
+}
+```
+
+### 13.7 매출 분석
+
+**향후 API**: `GET /api/admin/statistics/revenue`
+
+#### Query Parameters
+- `startDate` (optional): 시작 날짜
+- `endDate` (optional): 종료 날짜
+- `groupBy` (optional): 그룹화 기준 (month, year, course)
+
+#### 응답 예시
+```json
+{
+  "success": true,
+  "data": {
+    "totalRevenue": 15000000,
+    "projectedRevenue": 16000000,
+    "actualVsProjected": 93.75,
+    "byMonth": [
+      {
+        "month": "2024-01",
+        "revenue": 15000000,
+        "projected": 16000000,
+        "difference": -1000000,
+        "growth": 5.6
+      }
+    ],
+    "byCourse": [
+      {
+        "courseId": "course-001",
+        "courseName": "수학 기초반",
+        "revenue": 3600000,
+        "contribution": 24.0,
+        "enrollment": 18
+      }
+    ],
+    "byPaymentMethod": {
+      "cash": {
+        "amount": 6000000,
+        "percentage": 40.0
+      },
+      "card": {
+        "amount": 5000000,
+        "percentage": 33.3
+      },
+      "transfer": {
+        "amount": 4000000,
+        "percentage": 26.7
+      }
+    },
+    "trend": {
+      "growth": 5.6,
+      "averageMonthlyGrowth": 4.2
+    }
+  }
+}
+```
+
+### 13.8 경영 지표 (KPI)
+
+**향후 API**: `GET /api/admin/statistics/kpi`
+
+#### Query Parameters
+- `period` (optional): 기간 (month, year)
+- `startDate` (optional): 시작 날짜
+- `endDate` (optional): 종료 날짜
+
+#### 응답 예시
+```json
+{
+  "success": true,
+  "data": {
+    "revenuePerStudent": 100000,
+    "averageCoursesPerStudent": 2.1,
+    "averageStudentsPerCourse": 13.6,
+    "averageCoursesPerInstructor": 2.5,
+    "monthlyOperatingEfficiency": 85.5,
+    "studentRetentionRate": 96.7,
+    "courseUtilizationRate": 68.0,
+    "instructorUtilizationRate": 80.0,
+    "collectionRate": 96.0,
+    "attendanceRate": 92.5
+  }
+}
+```
+
+### 13.9 통계 데이터 내보내기
+
+**향후 API**: `GET /api/admin/statistics/export`
+
+#### Query Parameters
+- `type` (required): 통계 유형 (students, courses, payments, attendance, instructors, revenue, kpi)
+- `format` (optional): 내보내기 형식 (excel, pdf, csv) - 기본값: excel
+- `startDate` (optional): 시작 날짜
+- `endDate` (optional): 종료 날짜
 
 ## 14. 문자 발송 API 🔄
 
