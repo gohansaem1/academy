@@ -70,7 +70,9 @@ export default function PaymentsPage() {
     amount: number;
     last_class_date: string;
     payment_date: string;
+    status?: 'pending' | 'confirmed';
   }>>([]);
+  const [editingRefundStatus, setEditingRefundStatus] = useState<Record<string, 'pending' | 'confirmed'>>({});
   const [statistics, setStatistics] = useState({
     totalRevenue: 0,
     refundAmount: 0,
@@ -589,18 +591,8 @@ export default function PaymentsPage() {
                  firstClassDate.getMonth() === paymentDateForFirst.getMonth() &&
                  payment.status !== 'cancelled';
         case 'refund':
-          // 환불 금액: 학생이 그만둔 상태이고 마지막 수업일이 선택된 달에 있는 경우
-          if (payment.student_status !== 'inactive' || !payment.student_last_class_date) return false;
-          const lastClassDate = new Date(payment.student_last_class_date);
-          // 전체 기간이 아닐 때는 마지막 수업일이 선택된 달에 있는지 확인
-          if (!showAllPeriod) {
-            const [selectedYear, selectedMonthNum] = selectedMonth.split('-').map(Number);
-            return lastClassDate.getFullYear() === selectedYear &&
-                   lastClassDate.getMonth() + 1 === selectedMonthNum &&
-                   payment.status !== 'cancelled';
-          }
-          // 전체 기간일 때는 그만둔 학생의 모든 결제 표시
-          return payment.status !== 'cancelled';
+          // 환불 금액 필터 선택 시 일반 결제 행은 표시하지 않음 (환불 금액 행만 표시)
+          return false;
         case 'all':
         default:
           // 전체: 취소 제외
