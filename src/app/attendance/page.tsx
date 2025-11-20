@@ -43,15 +43,44 @@ export default function AttendancePage() {
   const [attendances, setAttendances] = useState<Attendance[]>([]);
   const [recentAbsentStudents, setRecentAbsentStudents] = useState<RecentAbsentStudent[]>([]);
   const [recentLateStudents, setRecentLateStudents] = useState<RecentLateStudent[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<'date' | 'student'>('date');
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
-    fetchAttendances();
+    fetchStudents();
     fetchRecentAbsentStudents();
     fetchRecentLateStudents();
-  }, [selectedDate]);
+    if (viewMode === 'date') {
+      fetchAttendances();
+    }
+  }, [selectedDate, viewMode]);
 
+  useEffect(() => {
+    if (viewMode === 'student' && selectedStudentId) {
+      fetchStudentAttendances();
+    }
+  }, [selectedStudentId, viewMode]);
+
+  // 학생 목록 조회
+  const fetchStudents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      setStudents(data || []);
+    } catch (error) {
+      console.error('학생 목록 조회 오류:', error);
+    }
+  };
+
+  // 날짜별 출석 기록 조회
   const fetchAttendances = async () => {
     try {
       setLoading(true);
@@ -77,6 +106,39 @@ export default function AttendancePage() {
     } catch (error) {
       console.error('출석 기록 조회 오류:', error);
       alert('출석 기록을 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 학생별 출석 기록 조회
+  const fetchStudentAttendances = async () => {
+    if (!selectedStudentId) return;
+
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('attendance')
+        .select(`
+          *,
+          courses(name),
+          students(name)
+        `)
+        .eq('student_id', selectedStudentId)
+        .order('date', { ascending: false });
+
+      if (error) throw error;
+
+      const attendancesWithNames = (data || []).map((attendance: any) => ({
+        ...attendance,
+        course_name: attendance.courses?.name,
+        student_name: attendance.students?.name,
+      }));
+
+      setAttendances(attendancesWithNames);
+    } catch (error) {
+      console.error('학생 출석 기록 조회 오류:', error);
+      alert('학생 출석 기록을 불러오는 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
@@ -165,7 +227,11 @@ export default function AttendancePage() {
 
       if (error) throw error;
       
-      fetchAttendances();
+      if (viewMode === 'date') {
+        fetchAttendances();
+      } else {
+        fetchStudentAttendances();
+      }
       fetchRecentAbsentStudents();
       fetchRecentLateStudents();
     } catch (error) {
@@ -173,6 +239,29 @@ export default function AttendancePage() {
       alert('출석 상태 변경 중 오류가 발생했습니다.');
     }
   };
+
+  // 필터링된 학생 목록
+  const filteredStudents = students.filter(student =>
+    student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    student.phone.includes(searchTerm)
+  );
+
+  // 선택한 학생의 최근 한 달 출석 기록
+  const getRecentMonthAttendances = () => {
+    if (!selectedStudentId) return [];
+    
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    const dateStr = oneMonthAgo.toISOString().split('T')[0];
+
+    return attendances.filter(attendance => 
+      attendance.student_id === selectedStudentId && 
+      attendance.date >= dateStr
+    );
+  };
+
+  const recentMonthAttendances = getRecentMonthAttendances();
+  const selectedStudent = students.find(s => s.id === selectedStudentId);
 
   return (
     <div>
@@ -230,82 +319,246 @@ export default function AttendancePage() {
         </div>
       </div>
 
-      {/* 날짜별 출석 기록 */}
-      <div className="mb-4">
-        <Input
-          label="날짜 선택"
-          type="date"
-          value={selectedDate}
-          onChange={(e) => setSelectedDate(e.target.value)}
-          className="max-w-xs"
-        />
+      {/* 보기 모드 선택 */}
+      <div className="mb-4 flex gap-4">
+        <button
+          onClick={() => {
+            setViewMode('date');
+            setSelectedStudentId(null);
+          }}
+          className={`px-4 py-2 rounded-lg border transition-colors ${
+            viewMode === 'date'
+              ? 'bg-blue-600 text-white border-blue-600'
+              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+          }`}
+        >
+          날짜별 조회
+        </button>
+        <button
+          onClick={() => {
+            setViewMode('student');
+            setSelectedStudentId(null);
+            setAttendances([]);
+          }}
+          className={`px-4 py-2 rounded-lg border transition-colors ${
+            viewMode === 'student'
+              ? 'bg-blue-600 text-white border-blue-600'
+              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+          }`}
+        >
+          학생별 조회
+        </button>
       </div>
 
+      {/* 날짜별 조회 */}
+      {viewMode === 'date' && (
+        <div className="mb-4">
+          <Input
+            label="날짜 선택"
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="max-w-xs"
+          />
+        </div>
+      )}
+
+      {/* 학생별 조회 */}
+      {viewMode === 'student' && (
+        <div className="mb-6 space-y-4">
+          {/* 학생 검색 */}
+          <div>
+            <Input
+              label="학생 검색"
+              placeholder="학생명 또는 전화번호로 검색..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="max-w-md"
+            />
+          </div>
+
+          {/* 학생 목록 */}
+          {searchTerm && (
+            <div className="bg-white border rounded-lg p-4 max-h-60 overflow-y-auto">
+              <h3 className="font-semibold mb-2">학생 선택</h3>
+              {filteredStudents.length === 0 ? (
+                <p className="text-sm text-gray-500">검색 결과가 없습니다.</p>
+              ) : (
+                <div className="space-y-2">
+                  {filteredStudents.map((student) => (
+                    <button
+                      key={student.id}
+                      onClick={() => setSelectedStudentId(student.id)}
+                      className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                        selectedStudentId === student.id
+                          ? 'bg-blue-50 border-blue-500'
+                          : 'bg-white border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="font-medium">{student.name}</div>
+                      <div className="text-sm text-gray-500">{student.phone}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 선택한 학생 정보 및 최근 한 달 출석 요약 */}
+          {selectedStudent && (
+            <div className="bg-white border rounded-lg p-4">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold">{selectedStudent.name}</h3>
+                  <p className="text-sm text-gray-500">{selectedStudent.phone}</p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedStudentId(null);
+                    setAttendances([]);
+                  }}
+                >
+                  선택 해제
+                </Button>
+              </div>
+
+              {/* 최근 한 달 출석 통계 */}
+              {recentMonthAttendances.length > 0 && (
+                <div className="grid grid-cols-4 gap-4 mb-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">
+                      {recentMonthAttendances.filter(a => a.status === 'present').length}
+                    </div>
+                    <div className="text-sm text-gray-500">출석</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-yellow-600">
+                      {recentMonthAttendances.filter(a => a.status === 'late').length}
+                    </div>
+                    <div className="text-sm text-gray-500">지각</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-red-600">
+                      {recentMonthAttendances.filter(a => a.status === 'absent').length}
+                    </div>
+                    <div className="text-sm text-gray-500">결석</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-orange-600">
+                      {recentMonthAttendances.filter(a => a.status === 'early').length}
+                    </div>
+                    <div className="text-sm text-gray-500">조퇴</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 출석 기록 테이블 */}
       {loading ? (
         <div className="text-center py-8">로딩 중...</div>
       ) : attendances.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
-          선택한 날짜의 출석 기록이 없습니다.
+          {viewMode === 'date' 
+            ? '선택한 날짜의 출석 기록이 없습니다.'
+            : selectedStudentId
+            ? '해당 학생의 출석 기록이 없습니다.'
+            : '학생을 검색하고 선택해주세요.'}
         </div>
       ) : (
-        <div className="border rounded-lg overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>수업명</TableHead>
-                <TableHead>학생명</TableHead>
-                <TableHead>출석 상태</TableHead>
-                <TableHead className="text-right">작업</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {attendances.map((attendance) => (
-                <TableRow key={attendance.id}>
-                  <TableCell className="font-medium">
-                    {attendance.course_name || '-'}
-                  </TableCell>
-                  <TableCell>{attendance.student_name || '-'}</TableCell>
-                  <TableCell>
-                    <span className={`px-2 py-1 rounded text-sm ${STATUS_COLORS[attendance.status]}`}>
-                      {STATUS_LABELS[attendance.status]}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        size="sm"
-                        variant={attendance.status === 'present' ? 'default' : 'outline'}
-                        onClick={() => handleStatusChange(attendance.id, 'present')}
-                      >
-                        출석
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={attendance.status === 'late' ? 'default' : 'outline'}
-                        onClick={() => handleStatusChange(attendance.id, 'late')}
-                      >
-                        지각
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={attendance.status === 'absent' ? 'default' : 'outline'}
-                        onClick={() => handleStatusChange(attendance.id, 'absent')}
-                      >
-                        결석
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={attendance.status === 'early' ? 'default' : 'outline'}
-                        onClick={() => handleStatusChange(attendance.id, 'early')}
-                      >
-                        조퇴
-                      </Button>
-                    </div>
-                  </TableCell>
+        <div className="space-y-4">
+          {viewMode === 'student' && selectedStudentId && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-sm text-blue-800">
+                <strong>전체 출석 기록</strong> ({attendances.length}건)
+              </p>
+              {recentMonthAttendances.length > 0 && (
+                <p className="text-sm text-blue-600 mt-1">
+                  최근 한 달: {recentMonthAttendances.length}건
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {viewMode === 'student' && <TableHead>날짜</TableHead>}
+                  <TableHead>수업명</TableHead>
+                  {viewMode === 'date' && <TableHead>학생명</TableHead>}
+                  <TableHead>출석 상태</TableHead>
+                  <TableHead className="text-right">작업</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {(viewMode === 'student' && selectedStudentId
+                  ? attendances
+                  : attendances
+                ).map((attendance) => (
+                  <TableRow key={attendance.id}>
+                    {viewMode === 'student' && (
+                      <TableCell>
+                        {new Date(attendance.date).toLocaleDateString('ko-KR', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                          weekday: 'short',
+                        })}
+                      </TableCell>
+                    )}
+                    <TableCell className="font-medium">
+                      {attendance.course_name || '-'}
+                    </TableCell>
+                    {viewMode === 'date' && (
+                      <TableCell>{attendance.student_name || '-'}</TableCell>
+                    )}
+                    <TableCell>
+                      <span className={`px-2 py-1 rounded text-sm ${STATUS_COLORS[attendance.status]}`}>
+                        {STATUS_LABELS[attendance.status]}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant={attendance.status === 'present' ? 'default' : 'outline'}
+                          onClick={() => handleStatusChange(attendance.id, 'present')}
+                        >
+                          출석
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={attendance.status === 'late' ? 'default' : 'outline'}
+                          onClick={() => handleStatusChange(attendance.id, 'late')}
+                        >
+                          지각
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={attendance.status === 'absent' ? 'default' : 'outline'}
+                          onClick={() => handleStatusChange(attendance.id, 'absent')}
+                        >
+                          결석
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={attendance.status === 'early' ? 'default' : 'outline'}
+                          onClick={() => handleStatusChange(attendance.id, 'early')}
+                        >
+                          조퇴
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       )}
     </div>
