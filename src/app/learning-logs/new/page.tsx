@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { Course } from '@/types/course';
 import { Instructor } from '@/types/instructor';
@@ -10,23 +10,12 @@ import { useAuth } from '@/hooks/useAuth';
 import Button from '@/components/common/Button';
 import Input from '@/components/common/Input';
 
-export default function NewLearningLogPage() {
-  const { user, loading } = useAuth('TEACHER');
+function NewLearningLogContent() {
+  const { user, loading: authLoading } = useAuth('TEACHER');
   const router = useRouter();
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">로딩 중...</p>
-        </div>
-      </div>
-    );
-  }
   const searchParams = useSearchParams();
   const courseIdParam = searchParams.get('courseId');
-  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [courses, setCourses] = useState<Course[]>([]);
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [formData, setFormData] = useState<LearningLogFormData>({
@@ -37,6 +26,17 @@ export default function NewLearningLogPage() {
     notes: '',
   });
   const [errors, setErrors] = useState<Partial<Record<keyof LearningLogFormData, string>>>({});
+
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
 
   useEffect(() => {
     fetchCourses();
@@ -111,7 +111,7 @@ export default function NewLearningLogPage() {
     }
 
     try {
-      setLoading(true);
+      setSaving(true);
       const { error } = await supabase
         .from('learning_logs')
         .insert([{
@@ -138,7 +138,7 @@ export default function NewLearningLogPage() {
       console.error('학습일지 작성 오류:', error);
       alert('학습일지 작성 중 오류가 발생했습니다.');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
@@ -219,8 +219,8 @@ export default function NewLearningLogPage() {
         </div>
 
         <div className="flex gap-2 pt-4">
-          <Button type="submit" disabled={loading}>
-            {loading ? '작성 중...' : '작성'}
+          <Button type="submit" disabled={saving}>
+            {saving ? '작성 중...' : '작성'}
           </Button>
           <Button
             type="button"
@@ -232,6 +232,21 @@ export default function NewLearningLogPage() {
         </div>
       </form>
     </div>
+  );
+}
+
+export default function NewLearningLogPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">로딩 중...</p>
+        </div>
+      </div>
+    }>
+      <NewLearningLogContent />
+    </Suspense>
   );
 }
 
