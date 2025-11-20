@@ -731,6 +731,8 @@ export default function PaymentsPage() {
               <option value="all">전체</option>
               <option value="overdue">미납</option>
               <option value="confirmed">입금확인</option>
+              <option value="first_month">첫 달 금액</option>
+              <option value="refund">환불 금액</option>
             </select>
           </div>
           <Input
