@@ -28,6 +28,20 @@ export default function NewCoursePage() {
   });
   const [errors, setErrors] = useState<Partial<Record<keyof CourseFormData, string>>>({});
 
+  const fetchInstructors = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('instructors')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      setInstructors(data || []);
+    } catch (error) {
+      console.error('강사 목록 조회 오류:', error);
+    }
+  };
+
   useEffect(() => {
     if (!authLoading) {
       fetchInstructors();
@@ -44,23 +58,6 @@ export default function NewCoursePage() {
       </div>
     );
   }
-
-  const fetchInstructors = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('instructors')
-        .select('*')
-        .order('name');
-
-      if (error) throw error;
-      setInstructors(data || []);
-    } catch (error) {
-      console.error('강사 목록 조회 오류:', error);
-    }
-  };
-
-  // fetchInstructors 함수를 useEffect에서 사용할 수 있도록 선언
-  // eslint-disable-next-line react-hooks/exhaustive-deps
 
   const validate = (): boolean => {
     const newErrors: Partial<Record<keyof CourseFormData, string>> = {};
