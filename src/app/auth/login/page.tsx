@@ -27,7 +27,32 @@ export default function LoginPage() {
         password: formData.password,
       });
 
-      if (authError) throw authError;
+      if (authError) {
+        // 비밀번호 노출 경고인 경우 특별 처리
+        if (authError.message?.includes('password') || authError.message?.includes('exposed')) {
+          // 초기 비밀번호인 경우 비밀번호 변경 페이지로 이동
+          if (formData.password === '0000') {
+            // 사용자 정보를 먼저 확인
+            try {
+              const { data: userData } = await supabase
+                .from('users')
+                .select('*')
+                .eq('email', formData.email)
+                .single();
+
+              if (userData) {
+                // 임시로 사용자 정보 저장하고 비밀번호 변경 페이지로 이동
+                localStorage.setItem('temp_user', JSON.stringify(userData));
+                router.push('/profile/change-password?initial=true&email=' + encodeURIComponent(formData.email));
+                return;
+              }
+            } catch (err) {
+              console.error('사용자 정보 조회 오류:', err);
+            }
+          }
+        }
+        throw authError;
+      }
 
       if (data.user) {
         // 사용자 정보 조회
@@ -56,7 +81,16 @@ export default function LoginPage() {
       }
     } catch (error: any) {
       console.error('로그인 오류:', error);
-      setError(error.message || '로그인에 실패했습니다.');
+      // 비밀번호 노출 경고 메시지 처리
+      if (error.message?.includes('password') || error.message?.includes('exposed')) {
+        setError('보안을 위해 비밀번호를 변경해주세요. 비밀번호 변경 페이지로 이동합니다.');
+        // 잠시 후 비밀번호 변경 페이지로 이동
+        setTimeout(() => {
+          router.push('/profile/change-password?initial=true&email=' + encodeURIComponent(formData.email));
+        }, 2000);
+      } else {
+        setError(error.message || '로그인에 실패했습니다.');
+      }
     } finally {
       setLoading(false);
     }
