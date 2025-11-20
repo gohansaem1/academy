@@ -103,6 +103,22 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 | status | varchar(20) | NOT NULL, DEFAULT 'completed' | 결제 상태 (completed/pending/cancelled) |
 | created_at | timestamp | DEFAULT now() | 생성일시 |
 
+#### learning_logs (학습일지) ✅
+
+| 컬럼명 | 타입 | 제약조건 | 설명 |
+|--------|------|----------|------|
+| id | uuid | PRIMARY KEY, DEFAULT uuid_generate_v4() | 학습일지 ID |
+| course_id | uuid | NOT NULL, FOREIGN KEY | 수업 ID |
+| date | date | NOT NULL | 수업 날짜 |
+| content | text | NOT NULL | 학습 내용 |
+| homework | text | NULL | 숙제 |
+| notes | text | NULL | 특이사항 |
+| instructor_id | uuid | NOT NULL, FOREIGN KEY | 강사 ID (작성자) |
+| created_at | timestamp | DEFAULT now() | 생성일시 |
+| updated_at | timestamp | DEFAULT now() | 수정일시 |
+
+**제약조건**: (course_id, date) UNIQUE
+
 ## 4. SQL 스크립트
 
 ### 4.1 테이블 생성
