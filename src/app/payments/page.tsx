@@ -593,10 +593,61 @@ export default function PaymentsPage() {
     // 매출액 (모든 결제 금액 합계, 취소 제외)
     const totalRevenue = paymentsForStats.reduce((sum, p) => sum + p.amount, 0);
 
-    // 결제액 (완료/확인된 결제 금액 합계)
+    // 환불 금액 계산 (그만둔 학생의 마지막 달 환불)
+    let totalRefundAmount = 0;
+    paymentsForStats.forEach(payment => {
+      if (payment.student_status === 'inactive' && 
+          payment.student_last_class_date && 
+          payment.course_tuition_fee) {
+        const paymentDate = new Date(payment.payment_date);
+        const lastClassDate = new Date(payment.student_last_class_date);
+        const paymentYear = paymentDate.getFullYear();
+        const paymentMonth = paymentDate.getMonth() + 1;
+        
+        // 마지막 수업일이 결제일과 같은 달인 경우 환불 금액 계산
+        if (lastClassDate.getFullYear() === paymentYear && 
+            lastClassDate.getMonth() === paymentDate.getMonth()) {
+          const refundAmount = calculateRefundAmount(
+            payment.course_tuition_fee,
+            lastClassDate,
+            paymentYear,
+            paymentMonth
+          );
+          totalRefundAmount += refundAmount;
+        }
+      }
+    });
+
+    // 순매출액 (총 매출액 - 환불 금액)
+    const netRevenue = totalRevenue - totalRefundAmount;
+
+    // 결제액 (완료/확인된 결제 금액 합계, 환불 금액 차감)
     const paidAmount = paymentsForStats
       .filter(p => p.status === 'completed' || p.status === 'confirmed')
-      .reduce((sum, p) => sum + p.amount, 0);
+      .reduce((sum, p) => {
+        let amount = p.amount;
+        // 환불이 필요한 경우 환불 금액 차감
+        if (p.student_status === 'inactive' && 
+            p.student_last_class_date && 
+            p.course_tuition_fee) {
+          const paymentDate = new Date(p.payment_date);
+          const lastClassDate = new Date(p.student_last_class_date);
+          const paymentYear = paymentDate.getFullYear();
+          const paymentMonth = paymentDate.getMonth() + 1;
+          
+          if (lastClassDate.getFullYear() === paymentYear && 
+              lastClassDate.getMonth() === paymentDate.getMonth()) {
+            const refundAmount = calculateRefundAmount(
+              p.course_tuition_fee,
+              lastClassDate,
+              paymentYear,
+              paymentMonth
+            );
+            amount -= refundAmount;
+          }
+        }
+        return sum + amount;
+      }, 0);
 
     // 미납액 (결제일이 지났지만 아직 완료되지 않은 결제, 또는 상태가 pending인 결제)
     const overdueAmount = paymentsForStats
@@ -636,6 +687,8 @@ export default function PaymentsPage() {
 
     return {
       totalRevenue,
+      netRevenue,
+      refundAmount: totalRefundAmount,
       paidAmount,
       overdueAmount,
       previousOverdueAmount,
@@ -651,7 +704,7 @@ export default function PaymentsPage() {
       </div>
 
       {/* 통계 카드 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-white border rounded-lg p-4">
           {expectedRevenue !== null ? (
             <>
@@ -671,7 +724,23 @@ export default function PaymentsPage() {
               <div className="text-2xl font-bold text-gray-900">
                 {statistics.totalRevenue.toLocaleString()}원
               </div>
+              {statistics.refundAmount > 0 && (
+                <div className="text-xs text-gray-500 mt-1">
+                  환불: -{statistics.refundAmount.toLocaleString()}원
+                </div>
+              )}
             </>
+          )}
+        </div>
+        <div className="bg-white border rounded-lg p-4">
+          <div className="text-sm text-gray-500 mb-1">순매출액</div>
+          <div className="text-2xl font-bold text-blue-600">
+            {statistics.netRevenue.toLocaleString()}원
+          </div>
+          {statistics.refundAmount > 0 && (
+            <div className="text-xs text-gray-500 mt-1">
+              (매출 - 환불)
+            </div>
           )}
         </div>
         <div className="bg-white border rounded-lg p-4">
@@ -693,6 +762,19 @@ export default function PaymentsPage() {
           </div>
         </div>
       </div>
+      {statistics.refundAmount > 0 && (
+        <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-center gap-2">
+            <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <div>
+              <div className="text-sm font-medium text-yellow-800">환불 금액: {statistics.refundAmount.toLocaleString()}원</div>
+              <div className="text-xs text-yellow-600 mt-1">그만둔 학생의 마지막 달 환불 금액이 포함되어 있습니다.</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mb-4 space-y-4">
         <div className="flex gap-4 items-end flex-wrap">
