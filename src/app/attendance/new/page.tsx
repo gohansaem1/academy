@@ -209,8 +209,8 @@ export default function NewAttendancePage() {
         </div>
 
         <div className="flex gap-2 pt-4">
-          <Button type="submit" disabled={loading}>
-            {loading ? '기록 중...' : '기록'}
+          <Button type="submit" disabled={saving}>
+            {saving ? '기록 중...' : '기록'}
           </Button>
           <Button
             type="button"
