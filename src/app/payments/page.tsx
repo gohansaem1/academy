@@ -7,6 +7,7 @@ import { Payment } from '@/types/payment';
 import Button from '@/components/common/Button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/common/Table';
 import Input from '@/components/common/Input';
+import { calculateProportionalTuition, calculateRefundAmount } from '@/lib/utils/tuition';
 
 const PAYMENT_METHODS = {
   cash: '현금',
@@ -37,6 +38,10 @@ interface PaymentWithDueStatus extends Payment {
 
 interface PaymentWithStudent extends Payment {
   student_payment_due_day?: number | null;
+  student_first_class_date?: string | null;
+  student_last_class_date?: string | null;
+  student_status?: string | null;
+  course_tuition_fee?: number | null;
 }
 
 type PaymentFilter = 'all' | 'overdue' | 'confirmed';
@@ -55,6 +60,8 @@ export default function PaymentsPage() {
   const [showAllPeriod, setShowAllPeriod] = useState(false);
   const [expectedRevenue, setExpectedRevenue] = useState<number | null>(null);
   const [loadingExpectedRevenue, setLoadingExpectedRevenue] = useState(false);
+  const [expandedPayments, setExpandedPayments] = useState<Set<string>>(new Set());
+  const [expandedPayments, setExpandedPayments] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchPayments();
@@ -170,17 +177,25 @@ export default function PaymentsPage() {
           .from('payments')
           .select(`
             *,
-            students(name, payment_due_day, status),
-            courses(name)
+            students(name, payment_due_day, status, first_class_date, last_class_date),
+            courses(name, tuition_fee)
           `)
           .order('payment_date', { ascending: false })
           .order('created_at', { ascending: false });
 
         // 재학생만 필터링
-        const filteredData = (allData || []).filter((payment: any) => 
-          !payment.students || 
-          payment.students.status === 'active' || 
-          !payment.students.status
+        const filteredData = (allData || []).map((payment: any) => ({
+          ...payment,
+          student_payment_due_day: payment.students?.payment_due_day,
+          student_first_class_date: payment.students?.first_class_date,
+          student_last_class_date: payment.students?.last_class_date,
+          student_status: payment.students?.status,
+          course_tuition_fee: payment.courses?.tuition_fee,
+          student_name: payment.students?.name,
+          course_name: payment.courses?.name,
+        })).filter((payment: any) => 
+          !payment.student_status || 
+          payment.student_status === 'active'
         );
 
         data = filteredData;
@@ -197,19 +212,27 @@ export default function PaymentsPage() {
           .from('payments')
           .select(`
             *,
-            students(name, payment_due_day, status),
-            courses(name)
+            students(name, payment_due_day, status, first_class_date, last_class_date),
+            courses(name, tuition_fee)
           `)
           .gte('payment_date', startDate)
           .lte('payment_date', endDate)
           .order('payment_date', { ascending: false })
           .order('created_at', { ascending: false });
 
-        // 재학생만 필터링
-        const filteredMonthData = (monthData || []).filter((payment: any) => 
-          !payment.students || 
-          payment.students.status === 'active' || 
-          !payment.students.status
+        // 재학생만 필터링 및 데이터 매핑
+        const filteredMonthData = (monthData || []).map((payment: any) => ({
+          ...payment,
+          student_payment_due_day: payment.students?.payment_due_day,
+          student_first_class_date: payment.students?.first_class_date,
+          student_last_class_date: payment.students?.last_class_date,
+          student_status: payment.students?.status,
+          course_tuition_fee: payment.courses?.tuition_fee,
+          student_name: payment.students?.name,
+          course_name: payment.courses?.name,
+        })).filter((payment: any) => 
+          !payment.student_status || 
+          payment.student_status === 'active'
         );
 
         data = filteredMonthData;
@@ -246,9 +269,13 @@ export default function PaymentsPage() {
 
       const paymentsWithNames = (data || []).map((payment: any) => ({
         ...payment,
-        student_name: payment.students?.name,
-        student_payment_due_day: payment.students?.payment_due_day,
-        course_name: payment.courses?.name,
+        student_name: payment.student_name || payment.students?.name,
+        student_payment_due_day: payment.student_payment_due_day || payment.students?.payment_due_day,
+        student_first_class_date: payment.student_first_class_date || payment.students?.first_class_date,
+        student_last_class_date: payment.student_last_class_date || payment.students?.last_class_date,
+        student_status: payment.student_status || payment.students?.status,
+        course_tuition_fee: payment.course_tuition_fee || payment.courses?.tuition_fee,
+        course_name: payment.course_name || payment.courses?.name,
       }));
 
       // 현재 달 이전 데이터도 포함 (통계 계산용, 전체 기간이 아닐 때만)
@@ -732,6 +759,7 @@ export default function PaymentsPage() {
                     className="w-4 h-4"
                   />
                 </TableHead>
+                <TableHead className="w-12"></TableHead>
                 <TableHead>학생명</TableHead>
                 <TableHead>수업명</TableHead>
                 <TableHead>결제 금액</TableHead>
@@ -750,19 +778,116 @@ export default function PaymentsPage() {
                   ? STATUS_COLORS[payment.status as keyof typeof STATUS_COLORS]
                   : getDueStatusColor(dueStatus, payment.status);
 
+                const isExpanded = expandedPayments.has(payment.id);
+                
+                // 결제일 기준으로 연도와 월 추출
+                const paymentDate = new Date(payment.payment_date);
+                const paymentYear = paymentDate.getFullYear();
+                const paymentMonth = paymentDate.getMonth() + 1;
+                
+                // 첫 달인지 확인 (첫 수업일이 해당 달에 있는지)
+                const isFirstMonth = payment.student_first_class_date && (() => {
+                  const firstClassDate = new Date(payment.student_first_class_date);
+                  return firstClassDate.getFullYear() === paymentYear && 
+                         firstClassDate.getMonth() + 1 === paymentMonth;
+                })();
+                
+                // 마지막 달인지 확인 (마지막 수업일이 해당 달에 있고 학생이 그만둔 상태인지)
+                const isLastMonth = payment.student_status === 'inactive' && 
+                                    payment.student_last_class_date && (() => {
+                  const lastClassDate = new Date(payment.student_last_class_date);
+                  return lastClassDate.getFullYear() === paymentYear && 
+                         lastClassDate.getMonth() + 1 === paymentMonth;
+                })();
+                
+                // 첫 달 계산 정보
+                let firstMonthCalculation = null;
+                if (isFirstMonth && payment.student_first_class_date && payment.course_tuition_fee) {
+                  const firstClassDate = new Date(payment.student_first_class_date);
+                  const calculatedAmount = calculateProportionalTuition(
+                    payment.course_tuition_fee,
+                    firstClassDate,
+                    paymentYear,
+                    paymentMonth
+                  );
+                  const totalDaysInMonth = new Date(paymentYear, paymentMonth, 0).getDate();
+                  const firstClassDay = firstClassDate.getDate();
+                  const remainingDays = totalDaysInMonth - (firstClassDay - 1);
+                  
+                  firstMonthCalculation = {
+                    monthlyTuition: payment.course_tuition_fee,
+                    firstClassDate: payment.student_first_class_date,
+                    totalDaysInMonth,
+                    remainingDays,
+                    calculatedAmount,
+                  };
+                }
+                
+                // 마지막 달 환불 정보
+                let lastMonthRefund = null;
+                if (isLastMonth && payment.student_last_class_date && payment.course_tuition_fee) {
+                  const lastClassDate = new Date(payment.student_last_class_date);
+                  const refundAmount = calculateRefundAmount(
+                    payment.course_tuition_fee,
+                    lastClassDate,
+                    paymentYear,
+                    paymentMonth
+                  );
+                  const totalDaysInMonth = new Date(paymentYear, paymentMonth, 0).getDate();
+                  const lastClassDay = lastClassDate.getDate();
+                  const unattendedDays = totalDaysInMonth - lastClassDay;
+                  
+                  lastMonthRefund = {
+                    monthlyTuition: payment.course_tuition_fee,
+                    lastClassDate: payment.student_last_class_date,
+                    totalDaysInMonth,
+                    attendedDays: lastClassDay,
+                    unattendedDays,
+                    refundAmount,
+                  };
+                }
+
                 return (
-                  <TableRow key={payment.id}>
-                    <TableCell>
-                      <input
-                        type="checkbox"
-                        checked={selectedPayments.has(payment.id)}
-                        onChange={() => handleSelectPayment(payment.id)}
-                        className="w-4 h-4"
-                      />
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {payment.student_name || '-'}
-                    </TableCell>
+                  <>
+                    <TableRow key={payment.id}>
+                      <TableCell>
+                        <input
+                          type="checkbox"
+                          checked={selectedPayments.has(payment.id)}
+                          onChange={() => handleSelectPayment(payment.id)}
+                          className="w-4 h-4"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {(firstMonthCalculation || lastMonthRefund) && (
+                          <button
+                            onClick={() => {
+                              const newExpanded = new Set(expandedPayments);
+                              if (isExpanded) {
+                                newExpanded.delete(payment.id);
+                              } else {
+                                newExpanded.add(payment.id);
+                              }
+                              setExpandedPayments(newExpanded);
+                            }}
+                            className="text-gray-500 hover:text-gray-700"
+                            title="세부 정보 보기"
+                          >
+                            {isExpanded ? (
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            ) : (
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            )}
+                          </button>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {payment.student_name || '-'}
+                      </TableCell>
                     <TableCell>{payment.course_name || '-'}</TableCell>
                     <TableCell>{payment.amount.toLocaleString()}원</TableCell>
                     <TableCell>
@@ -814,6 +939,55 @@ export default function PaymentsPage() {
                       </div>
                     </TableCell>
                   </TableRow>
+                    {isExpanded && (
+                      <TableRow key={`${payment.id}-detail`} className="bg-gray-50">
+                        <TableCell colSpan={8} className="p-4">
+                          <div className="space-y-4">
+                            {firstMonthCalculation && (
+                              <div className="border-l-4 border-blue-500 pl-4">
+                                <h4 className="font-semibold text-gray-900 mb-2">첫 달 수업료 계산</h4>
+                                <div className="text-sm text-gray-700 space-y-1">
+                                  <p>월 수강료: {firstMonthCalculation.monthlyTuition.toLocaleString()}원</p>
+                                  <p>첫 수업일: {new Date(firstMonthCalculation.firstClassDate).toLocaleDateString('ko-KR')}</p>
+                                  <p>해당 월 총 일수: {firstMonthCalculation.totalDaysInMonth}일</p>
+                                  <p>남은 일수: {firstMonthCalculation.remainingDays}일</p>
+                                  <p className="font-semibold text-blue-600">
+                                    계산된 수강료: {firstMonthCalculation.calculatedAmount.toLocaleString()}원
+                                    <span className="text-gray-500 text-xs ml-2">
+                                      ({firstMonthCalculation.monthlyTuition.toLocaleString()}원 × {firstMonthCalculation.remainingDays}일 ÷ {firstMonthCalculation.totalDaysInMonth}일)
+                                    </span>
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                            {lastMonthRefund && (
+                              <div className="border-l-4 border-red-500 pl-4">
+                                <h4 className="font-semibold text-gray-900 mb-2">마지막 달 환불 계산</h4>
+                                <div className="text-sm text-gray-700 space-y-1">
+                                  <p>월 수강료: {lastMonthRefund.monthlyTuition.toLocaleString()}원</p>
+                                  <p>마지막 수업일: {new Date(lastMonthRefund.lastClassDate).toLocaleDateString('ko-KR')}</p>
+                                  <p>해당 월 총 일수: {lastMonthRefund.totalDaysInMonth}일</p>
+                                  <p>수업한 일수: {lastMonthRefund.attendedDays}일</p>
+                                  <p>미수업 일수: {lastMonthRefund.unattendedDays}일</p>
+                                  <p className="font-semibold text-red-600">
+                                    환불 금액: {lastMonthRefund.refundAmount.toLocaleString()}원
+                                    <span className="text-gray-500 text-xs ml-2">
+                                      ({lastMonthRefund.monthlyTuition.toLocaleString()}원 × {lastMonthRefund.unattendedDays}일 ÷ {lastMonthRefund.totalDaysInMonth}일)
+                                    </span>
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                            {!firstMonthCalculation && !lastMonthRefund && (
+                              <div className="text-sm text-gray-500">
+                                일반 결제 항목입니다. (전액 수강료)
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
                 );
               })}
             </TableBody>
