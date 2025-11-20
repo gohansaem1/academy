@@ -12,12 +12,14 @@ const STATUS_LABELS = {
   present: '출석',
   late: '지각',
   absent: '결석',
+  early: '조퇴',
 };
 
 const STATUS_COLORS = {
   present: 'bg-green-100 text-green-800',
   late: 'bg-yellow-100 text-yellow-800',
   absent: 'bg-red-100 text-red-800',
+  early: 'bg-orange-100 text-orange-800',
 };
 
 export default function AttendancePage() {
@@ -144,6 +146,13 @@ export default function AttendancePage() {
                         onClick={() => handleStatusChange(attendance.id, 'absent')}
                       >
                         결석
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={attendance.status === 'early' ? 'default' : 'outline'}
+                        onClick={() => handleStatusChange(attendance.id, 'early')}
+                      >
+                        조퇴
                       </Button>
                     </div>
                   </TableCell>

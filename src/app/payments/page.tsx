@@ -17,12 +17,14 @@ const PAYMENT_METHODS = {
 const STATUS_LABELS = {
   completed: '완료',
   pending: '대기',
+  confirmed: '확인됨',
   cancelled: '취소',
 };
 
 const STATUS_COLORS = {
   completed: 'bg-green-100 text-green-800',
   pending: 'bg-yellow-100 text-yellow-800',
+  confirmed: 'bg-blue-100 text-blue-800',
   cancelled: 'bg-red-100 text-red-800',
 };
 
@@ -62,6 +64,24 @@ export default function PaymentsPage() {
       alert('결제 이력을 불러오는 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleConfirm = async (id: string) => {
+    if (!confirm('입금을 확인하시겠습니까?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('payments')
+        .update({ status: 'confirmed' })
+        .eq('id', id);
+
+      if (error) throw error;
+      fetchPayments();
+      alert('입금이 확인되었습니다.');
+    } catch (error) {
+      console.error('입금 확인 오류:', error);
+      alert('입금 확인 중 오류가 발생했습니다.');
     }
   };
 

@@ -35,6 +35,12 @@ export default function Header() {
             출석 관리
           </Link>
           <Link
+            href="/attendance/statistics"
+            className="transition-colors hover:text-foreground/80 text-foreground/60"
+          >
+            출석 통계
+          </Link>
+          <Link
             href="/payments"
             className="transition-colors hover:text-foreground/80 text-foreground/60"
           >

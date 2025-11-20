@@ -26,7 +26,7 @@ export default function NewPaymentPage() {
     amount: 0,
     payment_method: 'cash',
     payment_date: new Date().toISOString().split('T')[0],
-    status: 'completed',
+    status: 'pending',
   });
   const [errors, setErrors] = useState<Partial<Record<keyof PaymentFormData, string>>>({});
 
@@ -107,7 +107,7 @@ export default function NewPaymentPage() {
           amount: formData.amount,
           payment_method: formData.payment_method,
           payment_date: formData.payment_date,
-          status: formData.status || 'completed',
+          status: formData.status || 'pending',
         }]);
 
       if (error) throw error;

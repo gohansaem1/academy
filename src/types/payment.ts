@@ -5,7 +5,7 @@ export interface Payment {
   amount: number;
   payment_method: 'cash' | 'card' | 'transfer';
   payment_date: string;
-  status: 'completed' | 'pending' | 'cancelled';
+  status: 'completed' | 'pending' | 'confirmed' | 'cancelled';
   created_at: string;
   student_name?: string;
   course_name?: string;

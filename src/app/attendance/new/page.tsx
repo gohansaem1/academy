@@ -190,6 +190,7 @@ export default function NewAttendancePage() {
             <option value="present">출석</option>
             <option value="late">지각</option>
             <option value="absent">결석</option>
+            <option value="early">조퇴</option>
           </select>
         </div>
 
