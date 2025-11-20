@@ -392,58 +392,23 @@ BEGIN
       -- 결제일 계산
       payment_date := DATE_TRUNC('month', current_month_start) + (due_day - 1) * INTERVAL '1 day';
       
-      -- 해당 달의 수업 일수 계산
-      total_days := 0;
-      FOR day_of_week IN SELECT (item->>'day_of_week')::INTEGER FROM jsonb_array_elements(schedule) AS item LOOP
-        month_start := current_month_start;
-        WHILE month_start <= current_month_end LOOP
-          IF EXTRACT(DOW FROM month_start) = day_of_week THEN
-            total_days := total_days + 1;
-          END IF;
-          month_start := month_start + INTERVAL '1 day';
-        END LOOP;
-      END LOOP;
+      -- 해당 달의 총 일수 계산
+      total_days_in_month := EXTRACT(DAY FROM (DATE_TRUNC('month', current_month_start) + INTERVAL '1 month' - INTERVAL '1 day'))::INTEGER;
       
-      -- 첫 수업일이 해당 달에 있는 경우: 비례 계산
-      IF first_class_date >= current_month_start AND first_class_date <= current_month_end THEN
-        remaining_days := 0;
-        FOR day_of_week IN SELECT (item->>'day_of_week')::INTEGER FROM jsonb_array_elements(schedule) AS item LOOP
-          month_start := GREATEST(first_class_date, current_month_start);
-          WHILE month_start <= current_month_end LOOP
-            IF EXTRACT(DOW FROM month_start) = day_of_week THEN
-              remaining_days := remaining_days + 1;
-            END IF;
-            month_start := month_start + INTERVAL '1 day';
-          END LOOP;
-        END LOOP;
-        
-        IF total_days > 0 THEN
-          payment_amount := ROUND((course_record.tuition_fee::NUMERIC * remaining_days) / total_days);
-        ELSE
-          payment_amount := course_record.tuition_fee;
-        END IF;
-      -- 그만둔 학생이고 마지막 수업일이 해당 달에 있는 경우: 비례 계산
-      ELSIF student_record.status = 'inactive' AND last_class_date IS NOT NULL 
-            AND last_class_date >= current_month_start AND last_class_date <= current_month_end THEN
-        attended_days := 0;
-        FOR day_of_week IN SELECT (item->>'day_of_week')::INTEGER FROM jsonb_array_elements(schedule) AS item LOOP
-          month_start := current_month_start;
-          WHILE month_start <= LEAST(last_class_date, current_month_end) LOOP
-            IF EXTRACT(DOW FROM month_start) = day_of_week THEN
-              attended_days := attended_days + 1;
-            END IF;
-            month_start := month_start + INTERVAL '1 day';
-          END LOOP;
-        END LOOP;
-        
-        IF total_days > 0 THEN
-          payment_amount := ROUND((course_record.tuition_fee::NUMERIC * attended_days) / total_days);
-        ELSE
-          payment_amount := course_record.tuition_fee;
-        END IF;
+      -- 첫 수업일이 해당 달에 있는 경우: 비례 계산 (해당 월 일수 기준)
+      IF first_class_date_val >= current_month_start AND first_class_date_val <= current_month_end THEN
+        -- 첫 수업일의 일자
+        remaining_days := total_days_in_month - (EXTRACT(DAY FROM first_class_date_val)::INTEGER - 1);
+        payment_amount := ROUND((course_record.tuition_fee::NUMERIC * remaining_days) / total_days_in_month);
+      -- 그만둔 학생이고 마지막 수업일이 해당 달에 있는 경우: 비례 계산 (해당 월 일수 기준)
+      ELSIF student_record.status = 'inactive' AND last_class_date_val IS NOT NULL 
+            AND last_class_date_val >= current_month_start AND last_class_date_val <= current_month_end THEN
+        -- 마지막 수업일의 일자
+        attended_days := EXTRACT(DAY FROM last_class_date_val)::INTEGER;
+        payment_amount := ROUND((course_record.tuition_fee::NUMERIC * attended_days) / total_days_in_month);
       -- 그만둔 학생이고 마지막 수업일이 해당 달 이전인 경우: 결제 생성 안 함
-      ELSIF student_record.status = 'inactive' AND last_class_date IS NOT NULL 
-            AND last_class_date < current_month_start THEN
+      ELSIF student_record.status = 'inactive' AND last_class_date_val IS NOT NULL 
+            AND last_class_date_val < current_month_start THEN
         payment_amount := 0;
       -- 일반적인 경우: 전액
       ELSE
