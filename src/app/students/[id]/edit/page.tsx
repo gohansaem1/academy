@@ -92,18 +92,53 @@ export default function EditStudentPage() {
 
     try {
       setSaving(true);
+      
+      // 현재 학생 정보 조회 (상태 변경 확인용)
+      const { data: currentStudent } = await supabase
+        .from('students')
+        .select('status')
+        .eq('id', params.id)
+        .single();
+      
+      let updateData: any = {
+        name: formData.name,
+        phone: formData.phone,
+        email: formData.email || null,
+        address: formData.address || null,
+        guardian_name: formData.guardian_name,
+        guardian_phone: formData.guardian_phone,
+        payment_due_day: formData.payment_due_day || null,
+        status: formData.status || 'active',
+      };
+      
+      // 그만둔 상태로 변경할 때 마지막 수업일자 기록
+      const newStatus = formData.status || 'active';
+      const oldStatus = currentStudent?.status || 'active';
+      
+      if (newStatus === 'inactive' && oldStatus !== 'inactive') {
+        // 학생의 마지막 출석일 조회
+        const { data: lastAttendance } = await supabase
+          .from('attendance')
+          .select('date')
+          .eq('student_id', params.id)
+          .order('date', { ascending: false })
+          .limit(1)
+          .single();
+        
+        if (lastAttendance) {
+          updateData.last_class_date = lastAttendance.date;
+        } else {
+          // 출석 기록이 없으면 오늘 날짜로 설정
+          updateData.last_class_date = new Date().toISOString().split('T')[0];
+        }
+      } else if (newStatus === 'active' && oldStatus === 'inactive') {
+        // 재학으로 변경할 때는 마지막 수업일자 초기화
+        updateData.last_class_date = null;
+      }
+      
       const { error } = await supabase
         .from('students')
-        .update({
-          name: formData.name,
-          phone: formData.phone,
-          email: formData.email || null,
-          address: formData.address || null,
-          guardian_name: formData.guardian_name,
-          guardian_phone: formData.guardian_phone,
-          payment_due_day: formData.payment_due_day || null,
-          status: formData.status || 'active',
-        })
+        .update(updateData)
         .eq('id', params.id);
 
       if (error) throw error;
