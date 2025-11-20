@@ -316,8 +316,6 @@ function StudentDetailContent() {
             {new Date(student.updated_at).toLocaleString('ko-KR')}
           </p>
         </div>
-      </div>
-
         </div>
       )}
 
