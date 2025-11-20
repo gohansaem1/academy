@@ -73,24 +73,20 @@ export default function PaymentsPage() {
 
       if (error) throw error;
 
-      // 지난 달 미납액 계산을 위한 데이터도 조회
-      const lastMonth = month === 1 ? 12 : month - 1;
-      const lastMonthYear = month === 1 ? year - 1 : year;
-      const lastMonthStart = `${lastMonthYear}-${String(lastMonth).padStart(2, '0')}-01`;
-      const lastMonthEnd = new Date(lastMonthYear, lastMonth, 0).toISOString().split('T')[0];
-
-      const { data: lastMonthData, error: lastMonthError } = await supabase
+      // 현재 달 이전의 모든 미납 데이터 조회 (지난 달까지 미납 총액 계산용)
+      const currentMonthStart = `${year}-${String(month).padStart(2, '0')}-01`;
+      
+      const { data: previousPaymentsData, error: previousPaymentsError } = await supabase
         .from('payments')
         .select(`
           *,
           students(name),
           courses(name)
         `)
-        .gte('payment_date', lastMonthStart)
-        .lte('payment_date', lastMonthEnd);
+        .lt('payment_date', currentMonthStart); // 현재 달 이전의 모든 결제
 
-      if (lastMonthError) {
-        console.error('지난 달 결제 데이터 조회 오류:', lastMonthError);
+      if (previousPaymentsError) {
+        console.error('이전 결제 데이터 조회 오류:', previousPaymentsError);
       }
 
       const paymentsWithNames = (data || []).map((payment: any) => ({
@@ -99,10 +95,10 @@ export default function PaymentsPage() {
         course_name: payment.courses?.name,
       }));
 
-      // 지난 달 데이터도 포함 (통계 계산용)
+      // 현재 달 이전 데이터도 포함 (통계 계산용)
       const allPayments = [
         ...paymentsWithNames,
-        ...((lastMonthData || []).map((payment: any) => ({
+        ...((previousPaymentsData || []).map((payment: any) => ({
           ...payment,
           student_name: payment.students?.name,
           course_name: payment.courses?.name,
@@ -310,20 +306,17 @@ export default function PaymentsPage() {
       })
       .reduce((sum, p) => sum + p.amount, 0);
 
-    // 지난 달 미납액 계산
-    const lastMonth = month === 1 ? 12 : month - 1;
-    const lastMonthYear = month === 1 ? year - 1 : year;
+    // 지난 달까지 미납 총액 계산 (현재 달 미납 제외)
+    const currentMonthStartDate = new Date(year, month - 1, 1);
+    currentMonthStartDate.setHours(0, 0, 0, 0);
     
     const previousOverdueAmount = payments
       .filter(p => {
         const paymentDate = new Date(p.payment_date);
-        const paymentMonth = paymentDate.getMonth() + 1;
-        const paymentYear = paymentDate.getFullYear();
         paymentDate.setHours(0, 0, 0, 0);
         
-        // 지난 달의 결제이고, 결제일이 지났으며, 아직 완료되지 않음
-        return paymentMonth === lastMonth &&
-               paymentYear === lastMonthYear &&
+        // 현재 달 이전의 결제이고, 결제일이 지났으며, 아직 완료되지 않음
+        return paymentDate < currentMonthStartDate &&
                paymentDate < today &&
                p.status !== 'completed' && 
                p.status !== 'confirmed' &&
@@ -368,7 +361,7 @@ export default function PaymentsPage() {
           </div>
         </div>
         <div className="bg-white border rounded-lg p-4">
-          <div className="text-sm text-gray-500 mb-1">지난 달 미납액</div>
+          <div className="text-sm text-gray-500 mb-1">지난 달까지 미납 총액</div>
           <div className="text-2xl font-bold text-orange-600">
             {statistics.previousOverdueAmount.toLocaleString()}원
           </div>
