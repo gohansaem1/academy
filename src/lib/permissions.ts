@@ -51,6 +51,7 @@ export const ROLE_MENUS: Record<UserRole, Array<{ href: string; label: string }>
     { href: '/instructors', label: '강사 관리' },
     { href: '/courses', label: '수업 관리' },
     { href: '/attendance', label: '출석 관리' },
+    { href: '/attendance/new', label: '출석 체크' },
     { href: '/attendance/statistics', label: '출석 통계' },
     { href: '/payments', label: '수강료 관리' },
     { href: '/learning-logs/new', label: '학습일지 작성' },
