@@ -543,18 +543,21 @@ export default function PaymentsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={editingPayments[payment.id]?.status !== undefined
-                            ? (editingPayments[payment.id].status === 'confirmed' || editingPayments[payment.id].status === 'completed')
-                            : (payment.status === 'confirmed' || payment.status === 'completed')}
+                        <select
+                          value={editingPayments[payment.id]?.status !== undefined
+                            ? editingPayments[payment.id].status!
+                            : payment.status}
                           onChange={(e) => {
-                            const newStatus = e.target.checked ? 'confirmed' : 'pending';
-                            handleEditPayment(payment.id, 'status', newStatus);
+                            handleEditPayment(payment.id, 'status', e.target.value);
                             handleSavePayment(payment.id);
                           }}
-                          className="w-4 h-4"
-                        />
+                          className="flex h-8 w-32 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                        >
+                          <option value="pending">대기</option>
+                          <option value="confirmed">확인됨</option>
+                          <option value="completed">완료</option>
+                          <option value="cancelled">취소</option>
+                        </select>
                         <span className={`px-2 py-1 rounded text-sm ${statusColor}`}>
                           {statusLabel}
                         </span>
