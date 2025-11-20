@@ -38,7 +38,7 @@ export default function Header() {
       <div className="container flex h-14 items-center">
         <div className="mr-4 flex">
           <Link href="/" className="mr-6 flex items-center space-x-2">
-            <span className="font-bold text-xl">학원 관리 시스템</span>
+            <span className="font-bold text-xl">펀빌리티 영어미술</span>
           </Link>
         </div>
         <nav className="flex items-center space-x-6 text-sm font-medium">

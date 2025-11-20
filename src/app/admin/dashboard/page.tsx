@@ -97,7 +97,7 @@ export default function AdminDashboardPage() {
         ? ((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 
         : 0;
 
-      // 출석률 계산
+      // 출석률 계산 (결석만 제외, 출석/지각/조퇴는 모두 출석으로 간주)
       const { data: attendanceData } = await supabase
         .from('attendance')
         .select('status')
@@ -105,10 +105,10 @@ export default function AdminDashboardPage() {
         .lte('date', lastDayOfMonth);
 
       const totalSessions = attendanceData?.length || 0;
-      const presentSessions = attendanceData?.filter(a => a.status === 'present' || a.status === 'late').length || 0;
+      const presentSessions = attendanceData?.filter(a => a.status !== 'absent').length || 0;
       const attendanceRate = totalSessions > 0 ? (presentSessions / totalSessions) * 100 : 0;
 
-      // 지난 달 출석률
+      // 지난 달 출석률 (결석만 제외, 출석/지각/조퇴는 모두 출석으로 간주)
       const { data: lastMonthAttendance } = await supabase
         .from('attendance')
         .select('status')
@@ -116,7 +116,7 @@ export default function AdminDashboardPage() {
         .lte('date', lastDayOfLastMonth);
 
       const lastMonthTotal = lastMonthAttendance?.length || 0;
-      const lastMonthPresent = lastMonthAttendance?.filter(a => a.status === 'present' || a.status === 'late').length || 0;
+      const lastMonthPresent = lastMonthAttendance?.filter(a => a.status !== 'absent').length || 0;
       const lastMonthAttendanceRate = lastMonthTotal > 0 ? (lastMonthPresent / lastMonthTotal) * 100 : 0;
       const attendanceRateGrowth = lastMonthAttendanceRate > 0 
         ? attendanceRate - lastMonthAttendanceRate 
@@ -167,7 +167,7 @@ export default function AdminDashboardPage() {
             .lte('date', lastDayOfMonth);
 
           const studentTotal = studentAttendance?.length || 0;
-          const studentPresent = studentAttendance?.filter(a => a.status === 'present' || a.status === 'late').length || 0;
+          const studentPresent = studentAttendance?.filter(a => a.status !== 'absent').length || 0;
           const studentRate = studentTotal > 0 ? (studentPresent / studentTotal) * 100 : 100;
 
           if (studentRate < 70 && studentTotal > 0) {

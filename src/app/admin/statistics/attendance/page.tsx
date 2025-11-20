@@ -90,7 +90,8 @@ export default function AttendanceStatisticsPage() {
       const late = attendanceData?.filter(a => a.status === 'late').length || 0;
       const absent = attendanceData?.filter(a => a.status === 'absent').length || 0;
       const early = attendanceData?.filter(a => a.status === 'early').length || 0;
-      const attendanceRate = totalSessions > 0 ? ((present + late) / totalSessions) * 100 : 0;
+      // 출석률 계산: 결석만 제외, 출석/지각/조퇴는 모두 출석으로 간주
+      const attendanceRate = totalSessions > 0 ? ((present + late + early) / totalSessions) * 100 : 0;
 
       // 월별 통계 (최근 6개월)
       const byMonth = [];
@@ -110,7 +111,8 @@ export default function AttendanceStatisticsPage() {
         const monthLate = monthAttendance?.filter(a => a.status === 'late').length || 0;
         const monthAbsent = monthAttendance?.filter(a => a.status === 'absent').length || 0;
         const monthEarly = monthAttendance?.filter(a => a.status === 'early').length || 0;
-        const monthRate = monthTotal > 0 ? ((monthPresent + monthLate) / monthTotal) * 100 : 0;
+        // 출석률 계산: 결석만 제외, 출석/지각/조퇴는 모두 출석으로 간주
+        const monthRate = monthTotal > 0 ? ((monthPresent + monthLate + monthEarly) / monthTotal) * 100 : 0;
 
         byMonth.push({
           month: `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`,
@@ -152,7 +154,8 @@ export default function AttendanceStatisticsPage() {
         const courseLate = courseAttendance.filter(a => a.status === 'late').length;
         const courseAbsent = courseAttendance.filter(a => a.status === 'absent').length;
         const courseEarly = courseAttendance.filter(a => a.status === 'early').length;
-        const courseRate = courseTotal > 0 ? ((coursePresent + courseLate) / courseTotal) * 100 : 0;
+        // 출석률 계산: 결석만 제외, 출석/지각/조퇴는 모두 출석으로 간주
+        const courseRate = courseTotal > 0 ? ((coursePresent + courseLate + courseEarly) / courseTotal) * 100 : 0;
 
         if (courseTotal > 0) {
           byCourse.push({

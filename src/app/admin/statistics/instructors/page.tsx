@@ -106,7 +106,8 @@ export default function InstructorStatisticsPage() {
                 attendanceByCourse[a.course_id] = { total: 0, present: 0 };
               }
               attendanceByCourse[a.course_id].total++;
-              if (a.status === 'present' || a.status === 'late') {
+              // 출석률 계산: 결석만 제외, 출석/지각/조퇴는 모두 출석으로 간주
+              if (a.status !== 'absent') {
                 attendanceByCourse[a.course_id].present++;
               }
             });

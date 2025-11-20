@@ -131,7 +131,8 @@ export default function KPIPage() {
         .lte('date', lastDayOfMonth);
 
       const totalSessions = attendanceData?.length || 0;
-      const presentSessions = attendanceData?.filter(a => a.status === 'present' || a.status === 'late').length || 0;
+      // 출석률 계산: 결석만 제외, 출석/지각/조퇴는 모두 출석으로 간주
+      const presentSessions = attendanceData?.filter(a => a.status !== 'absent').length || 0;
       const attendanceRate = totalSessions > 0 ? (presentSessions / totalSessions) * 100 : 0;
 
       // 수업 정원 대비 등록률
