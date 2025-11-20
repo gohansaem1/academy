@@ -47,6 +47,7 @@ export const ROLE_ROUTES: Record<UserRole, string[]> = {
 // 역할별 메뉴 항목
 export const ROLE_MENUS: Record<UserRole, Array<{ href: string; label: string }>> = {
   ADMIN: [
+    { href: '/admin/dashboard', label: '대시보드' },
     { href: '/students', label: '학생 관리' },
     { href: '/instructors', label: '강사 관리' },
     { href: '/courses', label: '수업 관리' },
