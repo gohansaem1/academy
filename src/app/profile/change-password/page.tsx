@@ -1,15 +1,18 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import Button from '@/components/common/Button';
 import Input from '@/components/common/Input';
 
-export default function ChangePasswordPage() {
+function ChangePasswordContent() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isInitial = searchParams.get('initial') === 'true';
+  
   const [formData, setFormData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -18,6 +21,13 @@ export default function ChangePasswordPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    // 초기 비밀번호 변경인 경우 현재 비밀번호 필드에 기본값 설정
+    if (isInitial) {
+      setFormData(prev => ({ ...prev, currentPassword: '0000' }));
+    }
+  }, [isInitial]);
 
   if (authLoading) {
     return (
@@ -170,6 +180,21 @@ export default function ChangePasswordPage() {
         </div>
       </form>
     </div>
+  );
+}
+
+export default function ChangePasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">로딩 중...</p>
+        </div>
+      </div>
+    }>
+      <ChangePasswordContent />
+    </Suspense>
   );
 }
 
