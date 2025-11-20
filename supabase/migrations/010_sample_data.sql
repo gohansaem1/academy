@@ -68,30 +68,37 @@ VALUES
 
 -- 수업 생성
 -- 화목토 과정 3개 (화요일=2, 목요일=4, 토요일=6)
-INSERT INTO courses (id, name, subject, instructor_id, schedule, capacity, tuition_fee, created_at, updated_at)
+-- 기존 컬럼들(day_of_week, start_time, end_time)도 채워줌 (하위 호환성)
+INSERT INTO courses (id, name, subject, instructor_id, day_of_week, start_time, end_time, schedule, capacity, tuition_fee, created_at, updated_at)
 VALUES
-  -- 화목토 과정 1
+  -- 화목토 과정 1 (첫 번째 스케줄을 기존 컬럼에 사용)
   ('20000000-0000-0000-0000-000000000001', '화목토 영어 기초반', '영어', '00000000-0000-0000-0000-000000000001',
+   2, '14:00', '15:30',
    '[{"day_of_week": 2, "start_time": "14:00", "end_time": "15:30"}, {"day_of_week": 4, "start_time": "14:00", "end_time": "15:30"}, {"day_of_week": 6, "start_time": "10:00", "end_time": "11:30"}]'::jsonb,
    8, 150000, NOW(), NOW()),
   -- 화목토 과정 2
   ('20000000-0000-0000-0000-000000000002', '화목토 영어 중급반', '영어', '00000000-0000-0000-0000-000000000001',
+   2, '16:00', '17:30',
    '[{"day_of_week": 2, "start_time": "16:00", "end_time": "17:30"}, {"day_of_week": 4, "start_time": "16:00", "end_time": "17:30"}, {"day_of_week": 6, "start_time": "13:00", "end_time": "14:30"}]'::jsonb,
    8, 180000, NOW(), NOW()),
   -- 화목토 과정 3
   ('20000000-0000-0000-0000-000000000003', '화목토 미술 창의반', '미술', '00000000-0000-0000-0000-000000000001',
+   2, '18:00', '19:30',
    '[{"day_of_week": 2, "start_time": "18:00", "end_time": "19:30"}, {"day_of_week": 4, "start_time": "18:00", "end_time": "19:30"}, {"day_of_week": 6, "start_time": "15:00", "end_time": "16:30"}]'::jsonb,
    8, 200000, NOW(), NOW()),
   -- 월수금 과정 1
   ('20000000-0000-0000-0000-000000000004', '월수금 영어 기초반', '영어', '00000000-0000-0000-0000-000000000001',
+   1, '14:00', '15:30',
    '[{"day_of_week": 1, "start_time": "14:00", "end_time": "15:30"}, {"day_of_week": 3, "start_time": "14:00", "end_time": "15:30"}, {"day_of_week": 5, "start_time": "14:00", "end_time": "15:30"}]'::jsonb,
    8, 150000, NOW(), NOW()),
   -- 월수금 과정 2
   ('20000000-0000-0000-0000-000000000005', '월수금 영어 중급반', '영어', '00000000-0000-0000-0000-000000000001',
+   1, '16:00', '17:30',
    '[{"day_of_week": 1, "start_time": "16:00", "end_time": "17:30"}, {"day_of_week": 3, "start_time": "16:00", "end_time": "17:30"}, {"day_of_week": 5, "start_time": "16:00", "end_time": "17:30"}]'::jsonb,
    8, 180000, NOW(), NOW()),
   -- 월수금 과정 3
   ('20000000-0000-0000-0000-000000000006', '월수금 미술 창의반', '미술', '00000000-0000-0000-0000-000000000001',
+   1, '18:00', '19:30',
    '[{"day_of_week": 1, "start_time": "18:00", "end_time": "19:30"}, {"day_of_week": 3, "start_time": "18:00", "end_time": "19:30"}, {"day_of_week": 5, "start_time": "18:00", "end_time": "19:30"}]'::jsonb,
    8, 200000, NOW(), NOW());
 
