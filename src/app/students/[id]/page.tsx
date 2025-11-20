@@ -530,7 +530,18 @@ function StudentDetailContent() {
                   <div className="mt-3 space-y-2">
                     <div>
                       <label className="text-sm font-medium text-gray-500">학습 내용</label>
-                      <p className="text-sm mt-1 whitespace-pre-wrap">{log.content}</p>
+                      <div className="text-sm mt-1 space-y-2">
+                        <p className="whitespace-pre-wrap">{log.content}</p>
+                        {log.student_comments && Object.keys(log.student_comments).length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-gray-200">
+                            {Object.entries(log.student_comments).map(([studentId, comment]) => (
+                              <div key={studentId} className="text-gray-700">
+                                <p className="whitespace-pre-wrap">{comment as string}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     {log.homework && (
                       <div>
@@ -542,22 +553,6 @@ function StudentDetailContent() {
                       <div>
                         <label className="text-sm font-medium text-gray-500">특이사항</label>
                         <p className="text-sm mt-1 whitespace-pre-wrap">{log.notes}</p>
-                      </div>
-                    )}
-                    {log.student_comments && Object.keys(log.student_comments).length > 0 && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">개별 코멘트</label>
-                        <div className="mt-2 space-y-2">
-                          {Object.entries(log.student_comments).map(([studentId, comment]) => {
-                            // 학생 상세 페이지에서는 이미 해당 학생의 코멘트만 필터링되어 있음
-                            const studentName = student?.id === studentId ? student.name : '학생';
-                            return (
-                              <div key={studentId} className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                <p className="text-sm whitespace-pre-wrap">{comment as string}</p>
-                              </div>
-                            );
-                          })}
-                        </div>
                       </div>
                     )}
                   </div>
