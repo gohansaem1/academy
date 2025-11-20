@@ -406,33 +406,32 @@ function StudentDetailContent() {
                             previousMonth
                           );
                         }
-                          
-                          // 환불 금액이 있으면 환불 결제 항목 생성
-                          if (currentMonthRefund > 0) {
-                            await supabase
-                              .from('payments')
-                              .insert([{
-                                student_id: params.id,
-                                course_id: enrollment.course_id,
-                                amount: currentMonthRefund,
-                                payment_method: 'transfer', // 환불은 계좌이체로
-                                payment_date: today.toISOString().split('T')[0],
-                                status: 'cancelled', // 환불은 취소 상태로 표시
-                              }]);
-                          }
-                          
-                          if (previousMonthRefund > 0) {
-                            await supabase
-                              .from('payments')
-                              .insert([{
-                                student_id: params.id,
-                                course_id: enrollment.course_id,
-                                amount: previousMonthRefund,
-                                payment_method: 'transfer',
-                                payment_date: today.toISOString().split('T')[0],
-                                status: 'cancelled',
-                              }]);
-                          }
+                        
+                        // 환불 금액이 있으면 환불 결제 항목 생성
+                        if (currentMonthRefund > 0) {
+                          await supabase
+                            .from('payments')
+                            .insert([{
+                              student_id: params.id,
+                              course_id: enrollment.course_id,
+                              amount: currentMonthRefund,
+                              payment_method: 'transfer', // 환불은 계좌이체로
+                              payment_date: today.toISOString().split('T')[0],
+                              status: 'cancelled', // 환불은 취소 상태로 표시
+                            }]);
+                        }
+                        
+                        if (previousMonthRefund > 0) {
+                          await supabase
+                            .from('payments')
+                            .insert([{
+                              student_id: params.id,
+                              course_id: enrollment.course_id,
+                              amount: previousMonthRefund,
+                              payment_method: 'transfer',
+                              payment_date: today.toISOString().split('T')[0],
+                              status: 'cancelled',
+                            }]);
                         }
                       }
                     }
