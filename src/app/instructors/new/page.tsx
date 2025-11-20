@@ -11,6 +11,7 @@ import Input from '@/components/common/Input';
 export default function NewInstructorPage() {
   const { user, loading: authLoading } = useAuth('ADMIN');
   const router = useRouter();
+  const [saving, setSaving] = useState(false);
 
   if (authLoading) {
     return (
@@ -22,8 +23,6 @@ export default function NewInstructorPage() {
       </div>
     );
   }
-
-  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState<InstructorFormData>({
     name: '',
     phone: '',

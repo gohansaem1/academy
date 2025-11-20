@@ -11,6 +11,16 @@ import Input from '@/components/common/Input';
 export default function NewStudentPage() {
   const { user, loading: authLoading } = useAuth('ADMIN');
   const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [formData, setFormData] = useState<StudentFormData>({
+    name: '',
+    phone: '',
+    email: '',
+    address: '',
+    guardian_name: '',
+    guardian_phone: '',
+  });
+  const [errors, setErrors] = useState<Partial<Record<keyof StudentFormData, string>>>({});
 
   if (authLoading) {
     return (
@@ -22,17 +32,6 @@ export default function NewStudentPage() {
       </div>
     );
   }
-
-  const [saving, setSaving] = useState(false);
-  const [formData, setFormData] = useState<StudentFormData>({
-    name: '',
-    phone: '',
-    email: '',
-    address: '',
-    guardian_name: '',
-    guardian_phone: '',
-  });
-  const [errors, setErrors] = useState<Partial<Record<keyof StudentFormData, string>>>({});
 
   const validate = (): boolean => {
     const newErrors: Partial<Record<keyof StudentFormData, string>> = {};

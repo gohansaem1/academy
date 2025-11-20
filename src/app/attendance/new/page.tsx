@@ -13,6 +13,7 @@ import Input from '@/components/common/Input';
 export default function NewAttendancePage() {
   const { user, loading: authLoading } = useAuth('TEACHER');
   const router = useRouter();
+  const [saving, setSaving] = useState(false);
 
   if (authLoading) {
     return (
@@ -24,8 +25,6 @@ export default function NewAttendancePage() {
       </div>
     );
   }
-
-  const [saving, setSaving] = useState(false);
   const [courses, setCourses] = useState<Course[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [formData, setFormData] = useState<AttendanceFormData>({
