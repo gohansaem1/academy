@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
-import { CourseFormData } from '@/types/course';
+import { CourseFormData, CourseSchedule } from '@/types/course';
 import { Instructor } from '@/types/instructor';
 import Button from '@/components/common/Button';
 import Input from '@/components/common/Input';
@@ -16,13 +16,15 @@ export default function EditCoursePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [instructors, setInstructors] = useState<Instructor[]>([]);
+  const [defaultStartTime, setDefaultStartTime] = useState('');
+  const [defaultEndTime, setDefaultEndTime] = useState('');
+  const [selectedDays, setSelectedDays] = useState<number[]>([]);
+  const [scheduleOverrides, setScheduleOverrides] = useState<Record<number, { start_time: string; end_time: string }>>({});
   const [formData, setFormData] = useState<CourseFormData>({
     name: '',
     subject: '',
     instructor_id: '',
-    day_of_week: 1,
-    start_time: '',
-    end_time: '',
+    schedule: [],
     capacity: 20,
     tuition_fee: 0,
   });
@@ -60,13 +62,45 @@ export default function EditCoursePage() {
 
       if (error) throw error;
 
+      // schedule 필드가 있으면 사용, 없으면 기존 필드로 변환
+      let schedule: CourseSchedule[] = [];
+      if (data.schedule && Array.isArray(data.schedule)) {
+        schedule = data.schedule;
+      } else {
+        // 기존 데이터 마이그레이션
+        schedule = [{
+          day_of_week: data.day_of_week,
+          start_time: data.start_time,
+          end_time: data.end_time,
+        }];
+      }
+
+      // 기본 시간 설정 (첫 번째 스케줄의 시간)
+      const firstSchedule = schedule[0];
+      setDefaultStartTime(firstSchedule.start_time);
+      setDefaultEndTime(firstSchedule.end_time);
+
+      // 선택된 요일 설정
+      const days = schedule.map(s => s.day_of_week);
+      setSelectedDays(days);
+
+      // 시간 오버라이드 설정 (기본 시간과 다른 경우)
+      const overrides: Record<number, { start_time: string; end_time: string }> = {};
+      schedule.forEach(s => {
+        if (s.start_time !== firstSchedule.start_time || s.end_time !== firstSchedule.end_time) {
+          overrides[s.day_of_week] = {
+            start_time: s.start_time,
+            end_time: s.end_time,
+          };
+        }
+      });
+      setScheduleOverrides(overrides);
+
       setFormData({
         name: data.name,
         subject: data.subject,
         instructor_id: data.instructor_id,
-        day_of_week: data.day_of_week,
-        start_time: data.start_time,
-        end_time: data.end_time,
+        schedule: schedule,
         capacity: data.capacity,
         tuition_fee: data.tuition_fee,
       });
@@ -77,6 +111,35 @@ export default function EditCoursePage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDayToggle = (dayIndex: number) => {
+    if (selectedDays.includes(dayIndex)) {
+      setSelectedDays(selectedDays.filter(d => d !== dayIndex));
+      const newOverrides = { ...scheduleOverrides };
+      delete newOverrides[dayIndex];
+      setScheduleOverrides(newOverrides);
+    } else {
+      setSelectedDays([...selectedDays, dayIndex].sort());
+    }
+  };
+
+  const handleScheduleOverride = (dayIndex: number, field: 'start_time' | 'end_time', value: string) => {
+    setScheduleOverrides({
+      ...scheduleOverrides,
+      [dayIndex]: {
+        ...scheduleOverrides[dayIndex],
+        [field]: value,
+      },
+    });
+  };
+
+  const buildSchedule = (): CourseSchedule[] => {
+    return selectedDays.map(dayIndex => ({
+      day_of_week: dayIndex,
+      start_time: scheduleOverrides[dayIndex]?.start_time || defaultStartTime,
+      end_time: scheduleOverrides[dayIndex]?.end_time || defaultEndTime,
+    }));
   };
 
   const validate = (): boolean => {
@@ -91,11 +154,14 @@ export default function EditCoursePage() {
     if (!formData.instructor_id) {
       newErrors.instructor_id = '강사를 선택해주세요.';
     }
-    if (!formData.start_time) {
-      newErrors.start_time = '시작 시간을 입력해주세요.';
+    if (selectedDays.length === 0) {
+      newErrors.schedule = '최소 하나의 요일을 선택해주세요.';
     }
-    if (!formData.end_time) {
-      newErrors.end_time = '종료 시간을 입력해주세요.';
+    if (!defaultStartTime) {
+      newErrors.schedule = '기본 시작 시간을 입력해주세요.';
+    }
+    if (!defaultEndTime) {
+      newErrors.schedule = '기본 종료 시간을 입력해주세요.';
     }
     if (formData.capacity <= 0) {
       newErrors.capacity = '정원은 1명 이상이어야 합니다.';
@@ -111,19 +177,30 @@ export default function EditCoursePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const schedule = buildSchedule();
+    if (schedule.length === 0) {
+      alert('최소 하나의 요일을 선택해주세요.');
+      return;
+    }
+
     if (!validate()) return;
 
     try {
       setSaving(true);
+      
+      // 하위 호환성을 위해 첫 번째 스케줄을 기본값으로 사용
+      const firstSchedule = schedule[0];
+      
       const { error } = await supabase
         .from('courses')
         .update({
           name: formData.name,
           subject: formData.subject,
           instructor_id: formData.instructor_id,
-          day_of_week: formData.day_of_week,
-          start_time: formData.start_time,
-          end_time: formData.end_time,
+          day_of_week: firstSchedule.day_of_week, // 하위 호환성
+          start_time: firstSchedule.start_time, // 하위 호환성
+          end_time: firstSchedule.end_time, // 하위 호환성
+          schedule: schedule, // 새로운 스케줄 필드
           capacity: formData.capacity,
           tuition_fee: formData.tuition_fee,
         })
@@ -190,43 +267,114 @@ export default function EditCoursePage() {
           )}
         </div>
 
+        {/* 기본 시간 설정 */}
+        <div className="bg-gray-50 border rounded-lg p-4">
+          <h3 className="text-sm font-semibold mb-3">기본 시간 설정</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="기본 시작 시간"
+              type="time"
+              value={defaultStartTime}
+              onChange={(e) => setDefaultStartTime(e.target.value)}
+              required
+            />
+            <Input
+              label="기본 종료 시간"
+              type="time"
+              value={defaultEndTime}
+              onChange={(e) => setDefaultEndTime(e.target.value)}
+              required
+            />
+          </div>
+        </div>
+
+        {/* 요일 선택 */}
         <div>
-          <label className="block text-sm font-medium mb-1 text-gray-700">
-            요일 <span className="text-red-500">*</span>
+          <label className="block text-sm font-medium mb-2 text-gray-700">
+            수업 요일 선택 <span className="text-red-500">*</span>
           </label>
-          <select
-            value={formData.day_of_week}
-            onChange={(e) => setFormData({ ...formData, day_of_week: parseInt(e.target.value) })}
-            className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-            required
-          >
+          <div className="grid grid-cols-7 gap-2">
             {DAYS_OF_WEEK.map((day, index) => (
-              <option key={index} value={index}>
+              <button
+                key={index}
+                type="button"
+                onClick={() => handleDayToggle(index)}
+                className={`p-3 border rounded-lg text-sm font-medium transition-colors ${
+                  selectedDays.includes(index)
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
                 {day}
-              </option>
+              </button>
             ))}
-          </select>
+          </div>
+          {errors.schedule && (
+            <p className="mt-1 text-sm text-red-500">{errors.schedule}</p>
+          )}
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <Input
-            label="시작 시간"
-            type="time"
-            value={formData.start_time}
-            onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-            error={errors.start_time}
-            required
-          />
-
-          <Input
-            label="종료 시간"
-            type="time"
-            value={formData.end_time}
-            onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
-            error={errors.end_time}
-            required
-          />
-        </div>
+        {/* 선택된 요일별 시간 설정 */}
+        {selectedDays.length > 0 && (
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-gray-700">
+              요일별 시간 설정 (선택사항 - 기본 시간과 다를 경우만 설정)
+            </label>
+            {selectedDays.map(dayIndex => {
+              const override = scheduleOverrides[dayIndex];
+              const showOverride = override?.start_time || override?.end_time;
+              
+              return (
+                <div key={dayIndex} className="border rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium">{DAYS_OF_WEEK[dayIndex]}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (showOverride) {
+                          const newOverrides = { ...scheduleOverrides };
+                          delete newOverrides[dayIndex];
+                          setScheduleOverrides(newOverrides);
+                        } else {
+                          setScheduleOverrides({
+                            ...scheduleOverrides,
+                            [dayIndex]: {
+                              start_time: defaultStartTime,
+                              end_time: defaultEndTime,
+                            },
+                          });
+                        }
+                      }}
+                      className="text-sm text-blue-600 hover:underline"
+                    >
+                      {showOverride ? '기본 시간 사용' : '시간 변경'}
+                    </button>
+                  </div>
+                  {showOverride ? (
+                    <div className="grid grid-cols-2 gap-4">
+                      <Input
+                        label="시작 시간"
+                        type="time"
+                        value={override?.start_time || defaultStartTime}
+                        onChange={(e) => handleScheduleOverride(dayIndex, 'start_time', e.target.value)}
+                      />
+                      <Input
+                        label="종료 시간"
+                        type="time"
+                        value={override?.end_time || defaultEndTime}
+                        onChange={(e) => handleScheduleOverride(dayIndex, 'end_time', e.target.value)}
+                      />
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">
+                      기본 시간 사용: {defaultStartTime || '-'} ~ {defaultEndTime || '-'}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <Input

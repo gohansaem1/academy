@@ -132,9 +132,29 @@ export default function CoursesPage() {
                     </span>
                   </TableCell>
                   <TableCell>{course.instructor_name || '-'}</TableCell>
-                  <TableCell>{DAYS_OF_WEEK[course.day_of_week]}</TableCell>
                   <TableCell>
-                    {course.start_time} ~ {course.end_time}
+                    {course.schedule && course.schedule.length > 0 ? (
+                      <div className="space-y-1">
+                        {course.schedule.map((s, idx) => (
+                          <div key={idx} className="text-sm">
+                            {DAYS_OF_WEEK[s.day_of_week]} {s.start_time}~{s.end_time}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div>
+                        {DAYS_OF_WEEK[course.day_of_week]} {course.start_time}~{course.end_time}
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {course.schedule && course.schedule.length > 0 ? (
+                      <div className="text-sm text-gray-500">
+                        {course.schedule.length}개 요일
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-500">-</div>
+                    )}
                   </TableCell>
                   <TableCell>
                     {course.enrolled_count || 0} / {course.capacity}

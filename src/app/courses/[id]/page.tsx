@@ -205,15 +205,20 @@ export default function CourseDetailPage() {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-sm font-medium text-gray-500">요일</label>
-            <p className="text-lg mt-1">{DAYS_OF_WEEK[course.day_of_week]}</p>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-gray-500">시간</label>
-            <p className="text-lg mt-1">
-              {course.start_time} ~ {course.end_time}
-            </p>
+            <label className="text-sm font-medium text-gray-500">수업 일정</label>
+            <div className="mt-1 space-y-1">
+              {course.schedule && course.schedule.length > 0 ? (
+                course.schedule.map((schedule, index) => (
+                  <p key={index} className="text-lg">
+                    {DAYS_OF_WEEK[schedule.day_of_week]} {schedule.start_time} ~ {schedule.end_time}
+                  </p>
+                ))
+              ) : (
+                <p className="text-lg">
+                  {DAYS_OF_WEEK[course.day_of_week]} {course.start_time} ~ {course.end_time}
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
