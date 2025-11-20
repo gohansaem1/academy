@@ -11,10 +11,10 @@ import Button from '@/components/common/Button';
 import Input from '@/components/common/Input';
 
 export default function NewAttendancePage() {
-  const { user, loading } = useAuth('TEACHER');
+  const { user, loading: authLoading } = useAuth('TEACHER');
   const router = useRouter();
 
-  if (loading) {
+  if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -24,7 +24,8 @@ export default function NewAttendancePage() {
       </div>
     );
   }
-  const [loading, setLoading] = useState(false);
+
+  const [saving, setSaving] = useState(false);
   const [courses, setCourses] = useState<Course[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [formData, setFormData] = useState<AttendanceFormData>({
@@ -102,7 +103,7 @@ export default function NewAttendancePage() {
     if (!validate()) return;
 
     try {
-      setLoading(true);
+      setSaving(true);
       const { error } = await supabase
         .from('attendance')
         .insert([{
@@ -127,7 +128,7 @@ export default function NewAttendancePage() {
       console.error('출석 기록 오류:', error);
       alert('출석 기록 중 오류가 발생했습니다.');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 

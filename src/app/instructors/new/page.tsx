@@ -9,10 +9,10 @@ import Button from '@/components/common/Button';
 import Input from '@/components/common/Input';
 
 export default function NewInstructorPage() {
-  const { user, loading } = useAuth('ADMIN');
+  const { user, loading: authLoading } = useAuth('ADMIN');
   const router = useRouter();
 
-  if (loading) {
+  if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -22,7 +22,8 @@ export default function NewInstructorPage() {
       </div>
     );
   }
-  const [loading, setLoading] = useState(false);
+
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState<InstructorFormData>({
     name: '',
     phone: '',
@@ -56,7 +57,7 @@ export default function NewInstructorPage() {
     if (!validate()) return;
 
     try {
-      setLoading(true);
+      setSaving(true);
       const { error } = await supabase
         .from('instructors')
         .insert([{
@@ -78,7 +79,7 @@ export default function NewInstructorPage() {
         alert('강사 등록 중 오류가 발생했습니다.');
       }
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 

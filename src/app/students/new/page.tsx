@@ -9,10 +9,10 @@ import Button from '@/components/common/Button';
 import Input from '@/components/common/Input';
 
 export default function NewStudentPage() {
-  const { user, loading } = useAuth('ADMIN');
+  const { user, loading: authLoading } = useAuth('ADMIN');
   const router = useRouter();
 
-  if (loading) {
+  if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -22,7 +22,8 @@ export default function NewStudentPage() {
       </div>
     );
   }
-  const [loading, setLoading] = useState(false);
+
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState<StudentFormData>({
     name: '',
     phone: '',
@@ -63,7 +64,7 @@ export default function NewStudentPage() {
     if (!validate()) return;
 
     try {
-      setLoading(true);
+      setSaving(true);
       const { error } = await supabase
         .from('students')
         .insert([{
@@ -87,7 +88,7 @@ export default function NewStudentPage() {
         alert('학생 등록 중 오류가 발생했습니다.');
       }
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
@@ -147,8 +148,8 @@ export default function NewStudentPage() {
         />
 
         <div className="flex gap-2 pt-4">
-          <Button type="submit" disabled={loading}>
-            {loading ? '등록 중...' : '등록'}
+          <Button type="submit" disabled={saving}>
+            {saving ? '등록 중...' : '등록'}
           </Button>
           <Button
             type="button"
