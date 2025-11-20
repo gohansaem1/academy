@@ -189,7 +189,7 @@ export default function PaymentsPage() {
           .order('payment_date', { ascending: false })
           .order('created_at', { ascending: false });
 
-        // 재학생만 필터링
+        // 재학생만 필터링 (환불 금액 필터 사용 시 그만둔 학생도 포함)
         const filteredData = (allData || []).map((payment: any) => ({
           ...payment,
           student_payment_due_day: payment.students?.payment_due_day,
@@ -199,10 +199,17 @@ export default function PaymentsPage() {
           course_tuition_fee: payment.courses?.tuition_fee,
           student_name: payment.students?.name,
           course_name: payment.courses?.name,
-        })).filter((payment: any) => 
-          !payment.student_status || 
-          payment.student_status === 'active'
-        );
+        })).filter((payment: any) => {
+          // 환불 금액 필터 사용 시 그만둔 학생도 포함
+          if (paymentFilter === 'refund') {
+            return payment.student_status === 'inactive' || 
+                   !payment.student_status || 
+                   payment.student_status === 'active';
+          }
+          // 기본적으로는 재학생만
+          return !payment.student_status || 
+                 payment.student_status === 'active';
+        });
 
         data = filteredData;
         error = allError;
@@ -226,7 +233,7 @@ export default function PaymentsPage() {
           .order('payment_date', { ascending: false })
           .order('created_at', { ascending: false });
 
-        // 재학생만 필터링 및 데이터 매핑
+        // 재학생만 필터링 및 데이터 매핑 (환불 금액 필터 사용 시 그만둔 학생도 포함)
         const filteredMonthData = (monthData || []).map((payment: any) => ({
           ...payment,
           student_payment_due_day: payment.students?.payment_due_day,
@@ -236,10 +243,17 @@ export default function PaymentsPage() {
           course_tuition_fee: payment.courses?.tuition_fee,
           student_name: payment.students?.name,
           course_name: payment.courses?.name,
-        })).filter((payment: any) => 
-          !payment.student_status || 
-          payment.student_status === 'active'
-        );
+        })).filter((payment: any) => {
+          // 환불 금액 필터 사용 시 그만둔 학생도 포함
+          if (paymentFilter === 'refund') {
+            return payment.student_status === 'inactive' || 
+                   !payment.student_status || 
+                   payment.student_status === 'active';
+          }
+          // 기본적으로는 재학생만
+          return !payment.student_status || 
+                 payment.student_status === 'active';
+        });
 
         data = filteredMonthData;
         error = monthError;

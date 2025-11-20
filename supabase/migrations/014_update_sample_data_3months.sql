@@ -129,12 +129,13 @@ BEGIN
       random_val NUMERIC;
       current_month_start DATE := DATE_TRUNC('month', CURRENT_DATE);
     BEGIN
-      -- 첫 수업일이 있으면 첫 수업일 이후, 없으면 2개월 전부터
-      IF student_record.first_class_date IS NOT NULL THEN
-        min_date := student_record.first_class_date;
-      ELSE
-        min_date := two_months_ago;
+      -- 첫 수업일이 반드시 있어야 함 (없으면 스킵)
+      IF student_record.first_class_date IS NULL THEN
+        CONTINUE;
       END IF;
+      
+      -- 최소 날짜는 첫 수업일
+      min_date := student_record.first_class_date;
       
       random_val := RANDOM();
       
@@ -142,20 +143,30 @@ BEGIN
       IF random_val < 0.3 THEN
         -- 현재 달의 1일부터 오늘까지
         max_date := current_date;
+        -- 첫 수업일이 현재 달 시작일보다 이전이면 현재 달 시작일부터
         IF min_date < current_month_start THEN
           min_date := current_month_start;
         END IF;
       ELSE
-        -- 나머지는 1-2개월 전
+        -- 나머지는 첫 수업일 이후부터 1개월 전까지
         max_date := one_month_ago;
+        -- 첫 수업일이 1개월 전보다 나중이면 첫 수업일부터 오늘까지
+        IF min_date > max_date THEN
+          max_date := current_date;
+        END IF;
       END IF;
       
-      -- 마지막 수업일이 첫 수업일보다 이전이 되지 않도록
+      -- 마지막 수업일이 첫 수업일보다 이전이 되지 않도록 보장
       IF min_date > max_date THEN
-        min_date := max_date;
+        CONTINUE; -- 유효한 범위가 없으면 스킵
       END IF;
       
       last_class_date_val := min_date + (RANDOM() * (max_date - min_date + 1))::INTEGER;
+      
+      -- 최종 확인: 마지막 수업일이 첫 수업일보다 이전이면 스킵
+      IF last_class_date_val < student_record.first_class_date THEN
+        CONTINUE;
+      END IF;
       
       -- 마지막 수업일만 설정 (상태는 자동으로 업데이트됨)
       UPDATE students
