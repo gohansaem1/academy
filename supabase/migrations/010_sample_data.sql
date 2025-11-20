@@ -282,7 +282,7 @@ BEGIN
   END LOOP;
 END $$;
 
--- 한 달치 학습일지 생성
+-- 한 달치 학습일지 생성 (학생별 개별 코멘트 포함)
 DO $$
 DECLARE
   course_record RECORD;
@@ -293,6 +293,11 @@ DECLARE
   day_of_week INTEGER;
   log_content TEXT;
   homework_content TEXT;
+  student_record RECORD;
+  student_comments JSONB;
+  comment_texts TEXT[];
+  random_val NUMERIC;
+  log_id UUID;
 BEGIN
   current_month_start := DATE_TRUNC('month', CURRENT_DATE);
   current_month_end := (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month' - INTERVAL '1 day')::DATE;
@@ -322,8 +327,37 @@ BEGIN
             ELSE '과제 없음'
           END;
           
+          -- 학생별 개별 코멘트 생성
+          student_comments := '{}'::jsonb;
+          FOR student_record IN 
+            SELECT s.* FROM students s
+            INNER JOIN course_enrollments ce ON s.id = ce.student_id
+            WHERE ce.course_id = course_record.id
+          LOOP
+            -- 60% 확률로 코멘트 추가
+            random_val := RANDOM();
+            IF random_val < 0.6 THEN
+              comment_texts := ARRAY[
+                student_record.name || ' 학생이 오늘 수업에 적극적으로 참여했습니다.',
+                student_record.name || ' 학생의 이해도가 좋아 보입니다.',
+                student_record.name || ' 학생이 집중력 있게 수업에 임했습니다.',
+                student_record.name || ' 학생의 발표가 인상적이었습니다.',
+                student_record.name || ' 학생이 오늘 배운 내용을 잘 이해한 것 같습니다.',
+                student_record.name || ' 학생이 수업 중 질문을 잘 했습니다.',
+                student_record.name || ' 학생의 실력 향상이 눈에 띕니다.',
+                student_record.name || ' 학생이 오늘 수업에서 좋은 아이디어를 제시했습니다.',
+                student_record.name || ' 학생이 수업 내용을 잘 정리하고 있습니다.',
+                student_record.name || ' 학생의 창의적인 접근이 돋보였습니다.'
+              ];
+              student_comments := student_comments || jsonb_build_object(
+                student_record.id::TEXT,
+                comment_texts[1 + floor(RANDOM() * array_length(comment_texts, 1))::INTEGER]
+              );
+            END IF;
+          END LOOP;
+          
           -- 학습일지 삽입
-          INSERT INTO learning_logs (course_id, date, content, homework, notes, instructor_id, created_at, updated_at)
+          INSERT INTO learning_logs (course_id, date, content, homework, notes, instructor_id, student_comments, created_at, updated_at)
           VALUES (
             course_record.id,
             class_date,
@@ -331,10 +365,13 @@ BEGIN
             homework_content,
             '수업 진행 상황 양호',
             course_record.instructor_id,
+            CASE WHEN jsonb_object_keys(student_comments) IS NOT NULL THEN student_comments ELSE NULL END,
             NOW(),
             NOW()
           )
-          ON CONFLICT (course_id, date) DO NOTHING;
+          ON CONFLICT (course_id, date) DO UPDATE SET
+            student_comments = EXCLUDED.student_comments
+          RETURNING id INTO log_id;
         END IF;
         
         class_date := class_date + INTERVAL '1 day';
