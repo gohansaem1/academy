@@ -58,6 +58,7 @@ export default function PaymentsPage() {
       const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
       const endDate = new Date(year, month, 0).toISOString().split('T')[0];
 
+      // 해당 달의 결제 데이터 조회
       const { data, error } = await supabase
         .from('payments')
         .select(`
@@ -72,13 +73,43 @@ export default function PaymentsPage() {
 
       if (error) throw error;
 
+      // 지난 달 미납액 계산을 위한 데이터도 조회
+      const lastMonth = month === 1 ? 12 : month - 1;
+      const lastMonthYear = month === 1 ? year - 1 : year;
+      const lastMonthStart = `${lastMonthYear}-${String(lastMonth).padStart(2, '0')}-01`;
+      const lastMonthEnd = new Date(lastMonthYear, lastMonth, 0).toISOString().split('T')[0];
+
+      const { data: lastMonthData, error: lastMonthError } = await supabase
+        .from('payments')
+        .select(`
+          *,
+          students(name),
+          courses(name)
+        `)
+        .gte('payment_date', lastMonthStart)
+        .lte('payment_date', lastMonthEnd);
+
+      if (lastMonthError) {
+        console.error('지난 달 결제 데이터 조회 오류:', lastMonthError);
+      }
+
       const paymentsWithNames = (data || []).map((payment: any) => ({
         ...payment,
         student_name: payment.students?.name,
         course_name: payment.courses?.name,
       }));
 
-      setPayments(paymentsWithNames);
+      // 지난 달 데이터도 포함 (통계 계산용)
+      const allPayments = [
+        ...paymentsWithNames,
+        ...((lastMonthData || []).map((payment: any) => ({
+          ...payment,
+          student_name: payment.students?.name,
+          course_name: payment.courses?.name,
+        })))
+      ];
+
+      setPayments(allPayments);
       setSelectedPayments(new Set()); // 월 변경 시 선택 초기화
     } catch (error) {
       console.error('결제 이력 조회 오류:', error);
@@ -227,7 +258,16 @@ export default function PaymentsPage() {
     }
   };
 
-  const filteredPayments = payments
+  // 해당 달의 결제만 필터링 (표시용)
+  const currentMonthPayments = payments.filter(p => {
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const paymentDate = new Date(p.payment_date);
+    const paymentMonth = paymentDate.getMonth() + 1;
+    const paymentYear = paymentDate.getFullYear();
+    return paymentMonth === month && paymentYear === year;
+  });
+
+  const filteredPayments = currentMonthPayments
     .map(payment => ({
       ...payment,
       dueStatus: getPaymentDueStatus(payment),
@@ -237,14 +277,102 @@ export default function PaymentsPage() {
       payment.course_name?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-  const totalAmount = filteredPayments
-    .filter(p => p.status === 'completed' || p.status === 'confirmed')
-    .reduce((sum, p) => sum + p.amount, 0);
+  // 통계 계산
+  const calculateStatistics = () => {
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // 해당 달의 결제만 필터링
+    const currentMonthPayments = payments.filter(p => {
+      const paymentDate = new Date(p.payment_date);
+      const paymentMonth = paymentDate.getMonth() + 1;
+      const paymentYear = paymentDate.getFullYear();
+      return paymentMonth === month && paymentYear === year && p.status !== 'cancelled';
+    });
+
+    // 해당 달 매출액 (모든 결제 금액 합계, 취소 제외)
+    const totalRevenue = currentMonthPayments.reduce((sum, p) => sum + p.amount, 0);
+
+    // 결제액 (완료/확인된 결제 금액 합계)
+    const paidAmount = currentMonthPayments
+      .filter(p => p.status === 'completed' || p.status === 'confirmed')
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    // 해당 달 미납액 (결제일이 지났지만 아직 완료되지 않은 결제)
+    const overdueAmount = currentMonthPayments
+      .filter(p => {
+        const paymentDate = new Date(p.payment_date);
+        paymentDate.setHours(0, 0, 0, 0);
+        return paymentDate < today &&
+               p.status !== 'completed' && 
+               p.status !== 'confirmed';
+      })
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    // 지난 달 미납액 계산
+    const lastMonth = month === 1 ? 12 : month - 1;
+    const lastMonthYear = month === 1 ? year - 1 : year;
+    
+    const previousOverdueAmount = payments
+      .filter(p => {
+        const paymentDate = new Date(p.payment_date);
+        const paymentMonth = paymentDate.getMonth() + 1;
+        const paymentYear = paymentDate.getFullYear();
+        paymentDate.setHours(0, 0, 0, 0);
+        
+        // 지난 달의 결제이고, 결제일이 지났으며, 아직 완료되지 않음
+        return paymentMonth === lastMonth &&
+               paymentYear === lastMonthYear &&
+               paymentDate < today &&
+               p.status !== 'completed' && 
+               p.status !== 'confirmed' &&
+               p.status !== 'cancelled';
+      })
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    return {
+      totalRevenue,
+      paidAmount,
+      overdueAmount,
+      previousOverdueAmount,
+    };
+  };
+
+  const statistics = calculateStatistics();
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">수강료 관리</h1>
+      </div>
+
+      {/* 통계 카드 */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white border rounded-lg p-4">
+          <div className="text-sm text-gray-500 mb-1">해당 달 매출액</div>
+          <div className="text-2xl font-bold text-gray-900">
+            {statistics.totalRevenue.toLocaleString()}원
+          </div>
+        </div>
+        <div className="bg-white border rounded-lg p-4">
+          <div className="text-sm text-gray-500 mb-1">결제액</div>
+          <div className="text-2xl font-bold text-green-600">
+            {statistics.paidAmount.toLocaleString()}원
+          </div>
+        </div>
+        <div className="bg-white border rounded-lg p-4">
+          <div className="text-sm text-gray-500 mb-1">미납액</div>
+          <div className="text-2xl font-bold text-red-600">
+            {statistics.overdueAmount.toLocaleString()}원
+          </div>
+        </div>
+        <div className="bg-white border rounded-lg p-4">
+          <div className="text-sm text-gray-500 mb-1">지난 달 미납액</div>
+          <div className="text-2xl font-bold text-orange-600">
+            {statistics.previousOverdueAmount.toLocaleString()}원
+          </div>
+        </div>
       </div>
 
       <div className="mb-4 space-y-4">
@@ -266,9 +394,6 @@ export default function PaymentsPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="max-w-md"
           />
-          <div className="text-lg font-semibold">
-            총 수납액: {totalAmount.toLocaleString()}원
-          </div>
         </div>
         {selectedPayments.size > 0 && (
           <div className="flex items-center gap-2">
