@@ -53,10 +53,102 @@ export default function PaymentsPage() {
   const [editingPayments, setEditingPayments] = useState<Record<string, { payment_method?: string; payment_date?: string; status?: string }>>({});
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
   const [showAllPeriod, setShowAllPeriod] = useState(false);
+  const [expectedRevenue, setExpectedRevenue] = useState<number | null>(null);
+  const [loadingExpectedRevenue, setLoadingExpectedRevenue] = useState(false);
 
   useEffect(() => {
     fetchPayments();
+    // 다음 달 조회 시 예상 매출액 계산
+    if (!showAllPeriod) {
+      checkIfNextMonth();
+    } else {
+      setExpectedRevenue(null);
+    }
   }, [selectedMonth, showAllPeriod]);
+
+  // 선택된 월이 다음 달인지 확인하고 예상 매출액 계산
+  const checkIfNextMonth = async () => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const [selectedYear, selectedMonthNum] = selectedMonth.split('-').map(Number);
+    
+    // 다음 달인지 확인
+    const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
+    const nextYear = currentMonth === 12 ? currentYear + 1 : currentYear;
+    
+    if (selectedYear === nextYear && selectedMonthNum === nextMonth) {
+      await fetchExpectedRevenue(selectedYear, selectedMonthNum);
+    } else {
+      setExpectedRevenue(null);
+    }
+  };
+
+  // 다음 달 예상 매출액 계산
+  const fetchExpectedRevenue = async (year: number, month: number) => {
+    try {
+      setLoadingExpectedRevenue(true);
+      
+      // 재학생 조회
+      const { data: activeStudents, error: studentsError } = await supabase
+        .from('students')
+        .select('id, payment_due_day')
+        .or('status.is.null,status.eq.active');
+      
+      if (studentsError) throw studentsError;
+      
+      if (!activeStudents || activeStudents.length === 0) {
+        setExpectedRevenue(0);
+        setLoadingExpectedRevenue(false);
+        return;
+      }
+      
+      // 각 학생의 등록된 수업 조회
+      const studentIds = activeStudents.map(s => s.id);
+      const { data: enrollments, error: enrollmentsError } = await supabase
+        .from('course_enrollments')
+        .select(`
+          student_id,
+          courses(tuition_fee)
+        `)
+        .in('student_id', studentIds);
+      
+      if (enrollmentsError) throw enrollmentsError;
+      
+      // 학생별 수강료 합계 계산
+      const studentTuitionMap = new Map<string, number>();
+      (enrollments || []).forEach((enrollment: any) => {
+        const studentId = enrollment.student_id;
+        const tuitionFee = enrollment.courses?.tuition_fee || 0;
+        const currentTotal = studentTuitionMap.get(studentId) || 0;
+        studentTuitionMap.set(studentId, currentTotal + tuitionFee);
+      });
+      
+      // 다음 달 결제일 계산 및 예상 매출액 합산
+      let totalExpectedRevenue = 0;
+      const nextMonthLastDay = new Date(year, month, 0).getDate();
+      
+      activeStudents.forEach(student => {
+        const dueDay = student.payment_due_day || 25;
+        // 결제일이 해당 월의 마지막 날보다 크면 마지막 날로 조정
+        const adjustedDueDay = Math.min(dueDay, nextMonthLastDay);
+        const paymentDate = new Date(year, month - 1, adjustedDueDay);
+        
+        // 다음 달 결제일이 해당 월에 포함되는지 확인
+        if (paymentDate.getMonth() === month - 1 && paymentDate.getFullYear() === year) {
+          const studentTuition = studentTuitionMap.get(student.id) || 0;
+          totalExpectedRevenue += studentTuition;
+        }
+      });
+      
+      setExpectedRevenue(totalExpectedRevenue);
+    } catch (error) {
+      console.error('예상 매출액 계산 오류:', error);
+      setExpectedRevenue(null);
+    } finally {
+      setLoadingExpectedRevenue(false);
+    }
+  };
 
   const fetchPayments = async () => {
     try {
@@ -505,13 +597,26 @@ export default function PaymentsPage() {
       </div>
 
       {/* 통계 카드 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className={`grid grid-cols-1 md:grid-cols-${expectedRevenue !== null ? '5' : '4'} gap-4 mb-6`}>
         <div className="bg-white border rounded-lg p-4">
           <div className="text-sm text-gray-500 mb-1">해당 달 매출액</div>
           <div className="text-2xl font-bold text-gray-900">
             {statistics.totalRevenue.toLocaleString()}원
           </div>
         </div>
+        {expectedRevenue !== null && (
+          <div className="bg-white border-2 border-blue-300 rounded-lg p-4">
+            <div className="text-sm text-blue-600 mb-1 font-medium">다음 달 예상 매출액</div>
+            <div className="text-2xl font-bold text-blue-600">
+              {loadingExpectedRevenue ? (
+                <span className="text-sm">계산 중...</span>
+              ) : (
+                `${expectedRevenue.toLocaleString()}원`
+              )}
+            </div>
+            <div className="text-xs text-gray-500 mt-1">재학생 기준 예상</div>
+          </div>
+        )}
         <div className="bg-white border rounded-lg p-4">
           <div className="text-sm text-gray-500 mb-1">결제액</div>
           <div className="text-2xl font-bold text-green-600">
