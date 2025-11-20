@@ -39,7 +39,7 @@ interface PaymentWithStudent extends Payment {
   student_payment_due_day?: number | null;
 }
 
-type PaymentFilter = 'all' | 'overdue' | 'confirmed' | 'cancelled';
+type PaymentFilter = 'all' | 'overdue' | 'confirmed';
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<PaymentWithStudent[]>([]);
@@ -376,9 +376,6 @@ export default function PaymentsPage() {
         case 'confirmed':
           // 입금확인: confirmed 또는 completed 상태
           return payment.status === 'confirmed' || payment.status === 'completed';
-        case 'cancelled':
-          // 취소: cancelled 상태
-          return payment.status === 'cancelled';
         case 'all':
         default:
           // 전체: 취소 제외
@@ -489,9 +486,7 @@ export default function PaymentsPage() {
       {/* 통계 카드 */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white border rounded-lg p-4">
-          <div className="text-sm text-gray-500 mb-1">
-            {showAllPeriod ? '전체 매출액' : '해당 달 매출액'}
-          </div>
+          <div className="text-sm text-gray-500 mb-1">해당 달 매출액</div>
           <div className="text-2xl font-bold text-gray-900">
             {statistics.totalRevenue.toLocaleString()}원
           </div>
@@ -553,7 +548,6 @@ export default function PaymentsPage() {
               <option value="all">전체</option>
               <option value="overdue">미납</option>
               <option value="confirmed">입금확인</option>
-              <option value="cancelled">취소</option>
             </select>
           </div>
           <Input
