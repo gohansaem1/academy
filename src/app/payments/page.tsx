@@ -63,7 +63,6 @@ export default function PaymentsPage() {
   const [expandedPayments, setExpandedPayments] = useState<Set<string>>(new Set());
   const [statistics, setStatistics] = useState({
     totalRevenue: 0,
-    netRevenue: 0,
     refundAmount: 0,
     paidAmount: 0,
     overdueAmount: 0,
@@ -658,9 +657,6 @@ export default function PaymentsPage() {
       console.error('환불 금액 계산 오류:', error);
     }
 
-    // 순매출액 (총 매출액 - 환불 금액)
-    const netRevenue = totalRevenue - totalRefundAmount;
-
     // 결제액 (완료/확인된 결제 금액 합계 - 환불 금액)
     // 환불 금액을 마이너스 결제로 포함
     const paidAmount = paymentsForStats
@@ -705,7 +701,6 @@ export default function PaymentsPage() {
 
     return {
       totalRevenue,
-      netRevenue,
       refundAmount: totalRefundAmount,
       paidAmount,
       overdueAmount,
@@ -727,7 +722,7 @@ export default function PaymentsPage() {
       </div>
 
       {/* 통계 카드 */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white border rounded-lg p-4">
           {expectedRevenue !== null ? (
             <>
@@ -748,22 +743,11 @@ export default function PaymentsPage() {
                 {statistics.totalRevenue.toLocaleString()}원
               </div>
               {statistics.refundAmount > 0 && (
-                <div className="text-xs text-gray-500 mt-1">
+                <div className="text-xs text-red-500 mt-1">
                   환불: -{statistics.refundAmount.toLocaleString()}원
                 </div>
               )}
             </>
-          )}
-        </div>
-        <div className="bg-white border rounded-lg p-4">
-          <div className="text-sm text-gray-500 mb-1">순매출액</div>
-          <div className="text-2xl font-bold text-blue-600">
-            {statistics.netRevenue.toLocaleString()}원
-          </div>
-          {statistics.refundAmount > 0 && (
-            <div className="text-xs text-gray-500 mt-1">
-              (매출 - 환불)
-            </div>
           )}
         </div>
         <div className="bg-white border rounded-lg p-4">
