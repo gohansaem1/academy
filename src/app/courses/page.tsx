@@ -115,8 +115,8 @@ export default function CoursesPage() {
                 <TableHead>수업명</TableHead>
                 <TableHead>과목</TableHead>
                 <TableHead>강사</TableHead>
-                <TableHead>요일</TableHead>
-                <TableHead>시간</TableHead>
+                <TableHead>수업 일정</TableHead>
+                <TableHead>요일 수</TableHead>
                 <TableHead>정원</TableHead>
                 <TableHead>수강료</TableHead>
                 <TableHead className="text-right">작업</TableHead>
