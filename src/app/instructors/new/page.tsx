@@ -12,6 +12,13 @@ export default function NewInstructorPage() {
   const { user, loading: authLoading } = useAuth('ADMIN');
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const [formData, setFormData] = useState<InstructorFormData>({
+    name: '',
+    phone: '',
+    email: '',
+    subject: '',
+  });
+  const [errors, setErrors] = useState<Partial<Record<keyof InstructorFormData, string>>>({});
 
   if (authLoading) {
     return (
@@ -23,13 +30,6 @@ export default function NewInstructorPage() {
       </div>
     );
   }
-  const [formData, setFormData] = useState<InstructorFormData>({
-    name: '',
-    phone: '',
-    email: '',
-    subject: '',
-  });
-  const [errors, setErrors] = useState<Partial<Record<keyof InstructorFormData, string>>>({});
 
   const validate = (): boolean => {
     const newErrors: Partial<Record<keyof InstructorFormData, string>> = {};

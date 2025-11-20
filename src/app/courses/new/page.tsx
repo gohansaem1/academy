@@ -16,18 +16,6 @@ export default function NewCoursePage() {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [instructors, setInstructors] = useState<Instructor[]>([]);
-  
-  if (authLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">로딩 중...</p>
-        </div>
-      </div>
-    );
-  }
-
   const [formData, setFormData] = useState<CourseFormData>({
     name: '',
     subject: '',
@@ -41,8 +29,21 @@ export default function NewCoursePage() {
   const [errors, setErrors] = useState<Partial<Record<keyof CourseFormData, string>>>({});
 
   useEffect(() => {
-    fetchInstructors();
-  }, []);
+    if (!authLoading) {
+      fetchInstructors();
+    }
+  }, [authLoading]);
+  
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
 
   const fetchInstructors = async () => {
     try {
@@ -57,6 +58,9 @@ export default function NewCoursePage() {
       console.error('강사 목록 조회 오류:', error);
     }
   };
+
+  // fetchInstructors 함수를 useEffect에서 사용할 수 있도록 선언
+  // eslint-disable-next-line react-hooks/exhaustive-deps
 
   const validate = (): boolean => {
     const newErrors: Partial<Record<keyof CourseFormData, string>> = {};
