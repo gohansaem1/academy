@@ -8,6 +8,7 @@ import Button from '@/components/common/Button';
 
 interface DashboardOverview {
   totalStudents: number;
+  inactiveStudents?: number;
   totalInstructors: number;
   totalCourses: number;
   activeEnrollments: number;
@@ -47,10 +48,17 @@ export default function AdminDashboardPage() {
     try {
       setLoading(true);
 
-      // 전체 학생 수
+      // 전체 학생 수 (재학생만)
       const { count: studentCount } = await supabase
         .from('students')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true })
+        .or('status.is.null,status.eq.active');
+      
+      // 그만둔 학생 수
+      const { count: inactiveStudentCount } = await supabase
+        .from('students')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'inactive');
 
       // 전체 강사 수
       const { count: instructorCount } = await supabase
@@ -124,6 +132,7 @@ export default function AdminDashboardPage() {
 
       setOverview({
         totalStudents: studentCount || 0,
+        inactiveStudents: inactiveStudentCount || 0,
         totalInstructors: instructorCount || 0,
         totalCourses: courseCount || 0,
         activeEnrollments: enrollmentCount || 0,
@@ -151,10 +160,11 @@ export default function AdminDashboardPage() {
         .select('*', { count: 'exact', head: true })
         .eq('status', 'pending');
 
-      // 출석률이 낮은 학생 수 (70% 미만)
+      // 출석률이 낮은 학생 수 (70% 미만, 재학생만)
       const { data: allStudents } = await supabase
         .from('students')
-        .select('id');
+        .select('id')
+        .or('status.is.null,status.eq.active');
 
       let lowAttendanceCount = 0;
       if (allStudents) {
@@ -183,10 +193,11 @@ export default function AdminDashboardPage() {
         lowAttendanceStudents: lowAttendanceCount,
       });
 
-      // 최근 활동 (최근 등록된 학생, 수업 등)
+      // 최근 활동 (최근 등록된 학생, 수업 등, 재학생만)
       const { data: recentStudents } = await supabase
         .from('students')
         .select('name, created_at')
+        .or('status.is.null,status.eq.active')
         .order('created_at', { ascending: false })
         .limit(5);
 
@@ -231,8 +242,11 @@ export default function AdminDashboardPage() {
           <div className="bg-white border rounded-lg p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500 mb-1">전체 학생 수</p>
+                <p className="text-sm text-gray-500 mb-1">재학생 수</p>
                 <p className="text-3xl font-bold">{overview.totalStudents}명</p>
+                {overview.inactiveStudents !== undefined && overview.inactiveStudents > 0 && (
+                  <p className="text-xs text-gray-400 mt-1">그만둔: {overview.inactiveStudents}명</p>
+                )}
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
                 <span className="text-2xl">👥</span>

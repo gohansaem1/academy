@@ -316,9 +316,33 @@ function StudentDetailContent() {
                 if (!confirm(`정말 ${newStatus === 'active' ? '재학' : '그만둔'} 상태로 변경하시겠습니까?`)) return;
                 
                 try {
+                  let updateData: { status: string; last_class_date?: string | null } = { status: newStatus };
+                  
+                  // 그만둔 상태로 변경할 때 마지막 수업일자 기록
+                  if (newStatus === 'inactive') {
+                    // 학생의 마지막 출석일 조회
+                    const { data: lastAttendance, error: attendanceError } = await supabase
+                      .from('attendance')
+                      .select('date')
+                      .eq('student_id', params.id)
+                      .order('date', { ascending: false })
+                      .limit(1)
+                      .single();
+                    
+                    if (!attendanceError && lastAttendance) {
+                      updateData.last_class_date = lastAttendance.date;
+                    } else {
+                      // 출석 기록이 없으면 오늘 날짜로 설정
+                      updateData.last_class_date = new Date().toISOString().split('T')[0];
+                    }
+                  } else {
+                    // 재학으로 변경할 때는 마지막 수업일자 초기화
+                    updateData.last_class_date = null;
+                  }
+                  
                   const { error } = await supabase
                     .from('students')
-                    .update({ status: newStatus })
+                    .update(updateData)
                     .eq('id', params.id);
                   
                   if (error) throw error;
@@ -363,6 +387,15 @@ function StudentDetailContent() {
           <label className="text-sm font-medium text-gray-500">보호자 전화번호</label>
           <p className="text-lg mt-1">{student.guardian_phone}</p>
         </div>
+
+        {student.status === 'inactive' && student.last_class_date && (
+          <div>
+            <label className="text-sm font-medium text-gray-500">마지막 수업일자</label>
+            <p className="text-lg mt-1">
+              {new Date(student.last_class_date).toLocaleDateString('ko-KR')}
+            </p>
+          </div>
+        )}
 
         <div>
           <label className="text-sm font-medium text-gray-500">등록일</label>

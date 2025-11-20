@@ -65,18 +65,25 @@ export default function PaymentsPage() {
       let data, error, previousPaymentsData, previousPaymentsError;
 
       if (showAllPeriod) {
-        // 전체 기간 조회
+        // 전체 기간 조회 (재학생만)
         const { data: allData, error: allError } = await supabase
           .from('payments')
           .select(`
             *,
-            students(name, payment_due_day),
+            students(name, payment_due_day, status),
             courses(name)
           `)
           .order('payment_date', { ascending: false })
           .order('created_at', { ascending: false });
 
-        data = allData;
+        // 재학생만 필터링
+        const filteredData = (allData || []).filter((payment: any) => 
+          !payment.students || 
+          payment.students.status === 'active' || 
+          !payment.students.status
+        );
+
+        data = filteredData;
         error = allError;
         previousPaymentsData = null; // 전체 기간일 때는 이전 데이터 불필요
       } else {
@@ -85,12 +92,12 @@ export default function PaymentsPage() {
         const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
         const endDate = new Date(year, month, 0).toISOString().split('T')[0];
 
-        // 해당 달의 결제 데이터 조회 (학생의 결제일 정보 포함)
+        // 해당 달의 결제 데이터 조회 (학생의 결제일 정보 포함, 재학생만)
         const { data: monthData, error: monthError } = await supabase
           .from('payments')
           .select(`
             *,
-            students(name, payment_due_day),
+            students(name, payment_due_day, status),
             courses(name)
           `)
           .gte('payment_date', startDate)
@@ -98,22 +105,36 @@ export default function PaymentsPage() {
           .order('payment_date', { ascending: false })
           .order('created_at', { ascending: false });
 
-        data = monthData;
+        // 재학생만 필터링
+        const filteredMonthData = (monthData || []).filter((payment: any) => 
+          !payment.students || 
+          payment.students.status === 'active' || 
+          !payment.students.status
+        );
+
+        data = filteredMonthData;
         error = monthError;
 
-        // 현재 달 이전의 모든 미납 데이터 조회 (지난 달까지 미납 총액 계산용)
+        // 현재 달 이전의 모든 미납 데이터 조회 (지난 달까지 미납 총액 계산용, 재학생만)
         const currentMonthStart = `${year}-${String(month).padStart(2, '0')}-01`;
         
         const { data: prevData, error: prevError } = await supabase
           .from('payments')
           .select(`
             *,
-            students(name, payment_due_day),
+            students(name, payment_due_day, status),
             courses(name)
           `)
           .lt('payment_date', currentMonthStart); // 현재 달 이전의 모든 결제
 
-        previousPaymentsData = prevData;
+        // 재학생만 필터링
+        const filteredPrevData = (prevData || []).filter((payment: any) => 
+          !payment.students || 
+          payment.students.status === 'active' || 
+          !payment.students.status
+        );
+
+        previousPaymentsData = filteredPrevData;
         previousPaymentsError = prevError;
 
         if (previousPaymentsError) {
