@@ -246,21 +246,38 @@ export default function AttendancePage() {
     student.phone.includes(searchTerm)
   );
 
-  // 선택한 학생의 최근 한 달 출석 기록
-  const getRecentMonthAttendances = () => {
+  // 선택한 학생의 이번 달 출석 기록
+  const getThisMonthAttendances = () => {
     if (!selectedStudentId) return [];
     
-    const oneMonthAgo = new Date();
-    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-    const dateStr = oneMonthAgo.toISOString().split('T')[0];
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
 
     return attendances.filter(attendance => 
       attendance.student_id === selectedStudentId && 
-      attendance.date >= dateStr
+      attendance.date >= firstDayOfMonth &&
+      attendance.date <= lastDayOfMonth
     );
   };
 
-  const recentMonthAttendances = getRecentMonthAttendances();
+  // 선택한 학생의 저번 달 출석 기록
+  const getLastMonthAttendances = () => {
+    if (!selectedStudentId) return [];
+    
+    const now = new Date();
+    const firstDayOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
+    const lastDayOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
+
+    return attendances.filter(attendance => 
+      attendance.student_id === selectedStudentId && 
+      attendance.date >= firstDayOfLastMonth &&
+      attendance.date <= lastDayOfLastMonth
+    );
+  };
+
+  const thisMonthAttendances = getThisMonthAttendances();
+  const lastMonthAttendances = getLastMonthAttendances();
   const selectedStudent = students.find(s => s.id === selectedStudentId);
 
   return (
@@ -424,35 +441,111 @@ export default function AttendancePage() {
                 </Button>
               </div>
 
-              {/* 최근 한 달 출석 통계 */}
-              {recentMonthAttendances.length > 0 && (
-                <div className="grid grid-cols-4 gap-4 mb-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">
-                      {recentMonthAttendances.filter(a => a.status === 'present').length}
+              {/* 출석 통계 (이번 달, 저번 달, 전체) */}
+              <div className="space-y-4">
+                {/* 이번 달 */}
+                {thisMonthAttendances.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-semibold mb-2 text-blue-600">
+                      이번 달 ({new Date().getMonth() + 1}월)
+                    </h4>
+                    <div className="grid grid-cols-4 gap-4">
+                      <div className="text-center bg-green-50 rounded-lg p-2">
+                        <div className="text-xl font-bold text-green-600">
+                          {thisMonthAttendances.filter(a => a.status === 'present').length}
+                        </div>
+                        <div className="text-xs text-gray-500">출석</div>
+                      </div>
+                      <div className="text-center bg-yellow-50 rounded-lg p-2">
+                        <div className="text-xl font-bold text-yellow-600">
+                          {thisMonthAttendances.filter(a => a.status === 'late').length}
+                        </div>
+                        <div className="text-xs text-gray-500">지각</div>
+                      </div>
+                      <div className="text-center bg-red-50 rounded-lg p-2">
+                        <div className="text-xl font-bold text-red-600">
+                          {thisMonthAttendances.filter(a => a.status === 'absent').length}
+                        </div>
+                        <div className="text-xs text-gray-500">결석</div>
+                      </div>
+                      <div className="text-center bg-orange-50 rounded-lg p-2">
+                        <div className="text-xl font-bold text-orange-600">
+                          {thisMonthAttendances.filter(a => a.status === 'early').length}
+                        </div>
+                        <div className="text-xs text-gray-500">조퇴</div>
+                      </div>
                     </div>
-                    <div className="text-sm text-gray-500">출석</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-yellow-600">
-                      {recentMonthAttendances.filter(a => a.status === 'late').length}
+                )}
+
+                {/* 저번 달 */}
+                {lastMonthAttendances.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-semibold mb-2 text-gray-600">
+                      저번 달 ({new Date().getMonth()}월)
+                    </h4>
+                    <div className="grid grid-cols-4 gap-4">
+                      <div className="text-center bg-green-50 rounded-lg p-2">
+                        <div className="text-xl font-bold text-green-600">
+                          {lastMonthAttendances.filter(a => a.status === 'present').length}
+                        </div>
+                        <div className="text-xs text-gray-500">출석</div>
+                      </div>
+                      <div className="text-center bg-yellow-50 rounded-lg p-2">
+                        <div className="text-xl font-bold text-yellow-600">
+                          {lastMonthAttendances.filter(a => a.status === 'late').length}
+                        </div>
+                        <div className="text-xs text-gray-500">지각</div>
+                      </div>
+                      <div className="text-center bg-red-50 rounded-lg p-2">
+                        <div className="text-xl font-bold text-red-600">
+                          {lastMonthAttendances.filter(a => a.status === 'absent').length}
+                        </div>
+                        <div className="text-xs text-gray-500">결석</div>
+                      </div>
+                      <div className="text-center bg-orange-50 rounded-lg p-2">
+                        <div className="text-xl font-bold text-orange-600">
+                          {lastMonthAttendances.filter(a => a.status === 'early').length}
+                        </div>
+                        <div className="text-xs text-gray-500">조퇴</div>
+                      </div>
                     </div>
-                    <div className="text-sm text-gray-500">지각</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-red-600">
-                      {recentMonthAttendances.filter(a => a.status === 'absent').length}
+                )}
+
+                {/* 전체 */}
+                {attendances.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-semibold mb-2 text-gray-800">전체</h4>
+                    <div className="grid grid-cols-4 gap-4">
+                      <div className="text-center bg-green-50 rounded-lg p-2">
+                        <div className="text-xl font-bold text-green-600">
+                          {attendances.filter(a => a.status === 'present').length}
+                        </div>
+                        <div className="text-xs text-gray-500">출석</div>
+                      </div>
+                      <div className="text-center bg-yellow-50 rounded-lg p-2">
+                        <div className="text-xl font-bold text-yellow-600">
+                          {attendances.filter(a => a.status === 'late').length}
+                        </div>
+                        <div className="text-xs text-gray-500">지각</div>
+                      </div>
+                      <div className="text-center bg-red-50 rounded-lg p-2">
+                        <div className="text-xl font-bold text-red-600">
+                          {attendances.filter(a => a.status === 'absent').length}
+                        </div>
+                        <div className="text-xs text-gray-500">결석</div>
+                      </div>
+                      <div className="text-center bg-orange-50 rounded-lg p-2">
+                        <div className="text-xl font-bold text-orange-600">
+                          {attendances.filter(a => a.status === 'early').length}
+                        </div>
+                        <div className="text-xs text-gray-500">조퇴</div>
+                      </div>
                     </div>
-                    <div className="text-sm text-gray-500">결석</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-orange-600">
-                      {recentMonthAttendances.filter(a => a.status === 'early').length}
-                    </div>
-                    <div className="text-sm text-gray-500">조퇴</div>
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -472,15 +565,18 @@ export default function AttendancePage() {
       ) : (
         <div className="space-y-4">
           {viewMode === 'student' && selectedStudentId && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
               <p className="text-sm text-blue-800">
                 <strong>전체 출석 기록</strong> ({attendances.length}건)
               </p>
-              {recentMonthAttendances.length > 0 && (
-                <p className="text-sm text-blue-600 mt-1">
-                  최근 한 달: {recentMonthAttendances.length}건
-                </p>
-              )}
+              <div className="flex gap-4 mt-2 text-xs text-blue-600">
+                {thisMonthAttendances.length > 0 && (
+                  <span>이번 달: {thisMonthAttendances.length}건</span>
+                )}
+                {lastMonthAttendances.length > 0 && (
+                  <span>저번 달: {lastMonthAttendances.length}건</span>
+                )}
+              </div>
             </div>
           )}
 
