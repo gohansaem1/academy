@@ -45,11 +45,23 @@ export default function LearningLogsPage() {
       if (error) throw error;
 
       // 데이터 변환
-      const transformedData = (data || []).map((log: any) => ({
-        ...log,
-        course_name: log.courses?.name || '-',
-        instructor_name: log.instructors?.name || '-',
-      }));
+      const transformedData = (data || []).map((log: any) => {
+        // 학습 내용에 학생 코멘트 포함
+        let fullContent = log.content || '';
+        if (log.student_comments && Object.keys(log.student_comments).length > 0) {
+          const comments = Object.entries(log.student_comments)
+            .map(([_, comment]) => comment as string)
+            .join('\n\n');
+          fullContent = fullContent + '\n\n' + comments;
+        }
+
+        return {
+          ...log,
+          course_name: log.courses?.name || '-',
+          instructor_name: log.instructors?.name || '-',
+          fullContent, // 전체 내용 (코멘트 포함)
+        };
+      });
 
       setLearningLogs(transformedData);
     } catch (error) {
@@ -141,8 +153,8 @@ export default function LearningLogsPage() {
                   </TableCell>
                   <TableCell>{log.instructor_name}</TableCell>
                   <TableCell className="max-w-md">
-                    <div className="truncate" title={log.content}>
-                      {log.content}
+                    <div className="truncate" title={(log as any).fullContent || log.content}>
+                      {(log as any).fullContent || log.content}
                     </div>
                   </TableCell>
                   <TableCell>
