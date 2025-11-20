@@ -61,6 +61,14 @@ export default function PaymentsPage() {
   const [expectedRevenue, setExpectedRevenue] = useState<number | null>(null);
   const [loadingExpectedRevenue, setLoadingExpectedRevenue] = useState(false);
   const [expandedPayments, setExpandedPayments] = useState<Set<string>>(new Set());
+  const [statistics, setStatistics] = useState({
+    totalRevenue: 0,
+    netRevenue: 0,
+    refundAmount: 0,
+    paidAmount: 0,
+    overdueAmount: 0,
+    previousOverdueAmount: 0,
+  });
 
   useEffect(() => {
     fetchPayments();
@@ -575,7 +583,7 @@ export default function PaymentsPage() {
   };
 
   // 통계 계산
-  const calculateStatistics = () => {
+  const calculateStatistics = async () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
