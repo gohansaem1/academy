@@ -1,27 +1,6 @@
-# 학습일지 테이블 추가 SQL
+-- 학습일지 테이블 생성 (빠른 수정용)
+-- Supabase SQL Editor에서 이 파일의 내용을 실행하세요
 
-학습일지 기능을 사용하기 위해 Supabase에 다음 SQL을 실행해야 합니다.
-
-## ⚠️ 중요: 오류 발생 시
-
-만약 `Could not find the table 'public.learning_logs'` 오류가 발생한다면, 이 가이드를 따라 테이블을 생성하세요.
-
-## 실행 방법
-
-1. [Supabase Dashboard](https://supabase.com/dashboard)에 로그인
-2. 프로젝트 선택: `krcncyrwiirgfvzsqpjy`
-3. 좌측 메뉴에서 **SQL Editor** 클릭
-4. **New query** 버튼 클릭
-5. 아래 SQL 스크립트를 복사하여 붙여넣기
-6. **Run** 버튼 클릭 (또는 `Ctrl+Enter` / `Cmd+Enter`)
-
-## 빠른 실행 방법
-
-`supabase/QUICK_FIX_LEARNING_LOGS.sql` 파일의 전체 내용을 복사하여 Supabase SQL Editor에 붙여넣고 실행하세요.
-
-## SQL 스크립트
-
-```sql
 -- updated_at 자동 업데이트 함수가 없으면 생성
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -60,26 +39,18 @@ CREATE TRIGGER update_learning_logs_updated_at
 -- RLS 활성화
 ALTER TABLE learning_logs ENABLE ROW LEVEL SECURITY;
 
--- RLS 정책 생성
+-- RLS 정책 생성 (기존 정책 삭제 후 재생성)
 DROP POLICY IF EXISTS "Allow all operations for authenticated users" ON learning_logs;
 CREATE POLICY "Allow all operations for authenticated users" ON learning_logs
   FOR ALL USING (true) WITH CHECK (true);
-```
 
-## 확인
-
-SQL 실행 후 다음 쿼리로 테이블이 생성되었는지 확인하세요:
-
-```sql
-SELECT table_name 
-FROM information_schema.tables 
+-- 테이블 생성 확인
+SELECT 
+  table_name,
+  column_name,
+  data_type
+FROM information_schema.columns
 WHERE table_schema = 'public' 
-AND table_name = 'learning_logs';
-```
-
-## 참고
-
-- `learning_logs` 테이블은 `courses`와 `instructors` 테이블에 의존합니다
-- 한 수업에 같은 날짜의 학습일지는 하나만 등록 가능합니다 (UNIQUE 제약조건)
-- 수업이 삭제되면 해당 수업의 학습일지도 함께 삭제됩니다 (CASCADE)
+AND table_name = 'learning_logs'
+ORDER BY ordinal_position;
 
