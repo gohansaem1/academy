@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase/client';
 import { Course, CourseEnrollment } from '@/types/course';
+import { LearningLog } from '@/types/learning-log';
 import Button from '@/components/common/Button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/common/Table';
 
@@ -15,12 +16,14 @@ export default function CourseDetailPage() {
   const router = useRouter();
   const [course, setCourse] = useState<Course | null>(null);
   const [enrollments, setEnrollments] = useState<CourseEnrollment[]>([]);
+  const [learningLogs, setLearningLogs] = useState<LearningLog[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (params.id) {
       fetchCourse(params.id as string);
       fetchEnrollments(params.id as string);
+      fetchLearningLogs(params.id as string);
     }
   }, [params.id]);
 
@@ -72,6 +75,48 @@ export default function CourseDetailPage() {
       setEnrollments(enrollmentsWithNames);
     } catch (error) {
       console.error('등록 학생 조회 오류:', error);
+    }
+  };
+
+  const fetchLearningLogs = async (courseId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('learning_logs')
+        .select(`
+          *,
+          instructors(name)
+        `)
+        .eq('course_id', courseId)
+        .order('date', { ascending: false });
+
+      if (error) throw error;
+
+      const logsWithNames = (data || []).map((log: any) => ({
+        ...log,
+        instructor_name: log.instructors?.name,
+      }));
+
+      setLearningLogs(logsWithNames);
+    } catch (error) {
+      console.error('학습일지 조회 오류:', error);
+    }
+  };
+
+  const handleDeleteLog = async (logId: string) => {
+    if (!confirm('정말 삭제하시겠습니까?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('learning_logs')
+        .delete()
+        .eq('id', logId);
+
+      if (error) throw error;
+      fetchLearningLogs(params.id as string);
+      alert('학습일지가 삭제되었습니다.');
+    } catch (error) {
+      console.error('학습일지 삭제 오류:', error);
+      alert('학습일지 삭제 중 오류가 발생했습니다.');
     }
   };
 

@@ -40,6 +40,12 @@ export default function Header() {
           >
             수강료 관리
           </Link>
+          <Link
+            href="/learning-logs/new"
+            className="transition-colors hover:text-foreground/80 text-foreground/60"
+          >
+            학습일지 작성
+          </Link>
         </nav>
       </div>
     </header>

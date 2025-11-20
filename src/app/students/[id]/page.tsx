@@ -5,17 +5,22 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase/client';
 import { Student } from '@/types/student';
+import { LearningLog } from '@/types/learning-log';
 import Button from '@/components/common/Button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/common/Table';
 
 export default function StudentDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [student, setStudent] = useState<Student | null>(null);
+  const [learningLogs, setLearningLogs] = useState<LearningLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [logsLoading, setLogsLoading] = useState(false);
 
   useEffect(() => {
     if (params.id) {
       fetchStudent(params.id as string);
+      fetchLearningLogs(params.id as string);
     }
   }, [params.id]);
 
@@ -36,6 +41,52 @@ export default function StudentDetailPage() {
       router.push('/students');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchLearningLogs = async (studentId: string) => {
+    try {
+      setLogsLoading(true);
+      // 학생이 수강하는 수업 조회
+      const { data: enrollments, error: enrollmentError } = await supabase
+        .from('course_enrollments')
+        .select('course_id')
+        .eq('student_id', studentId);
+
+      if (enrollmentError) throw enrollmentError;
+
+      if (!enrollments || enrollments.length === 0) {
+        setLearningLogs([]);
+        return;
+      }
+
+      const courseIds = enrollments.map(e => e.course_id);
+
+      // 해당 수업들의 학습일지 조회
+      const { data, error } = await supabase
+        .from('learning_logs')
+        .select(`
+          *,
+          courses(name, subject),
+          instructors(name)
+        `)
+        .in('course_id', courseIds)
+        .order('date', { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+
+      const logsWithNames = (data || []).map((log: any) => ({
+        ...log,
+        course_name: log.courses?.name,
+        instructor_name: log.instructors?.name,
+      }));
+
+      setLearningLogs(logsWithNames);
+    } catch (error) {
+      console.error('학습일지 조회 오류:', error);
+    } finally {
+      setLogsLoading(false);
     }
   };
 
@@ -123,6 +174,50 @@ export default function StudentDetailPage() {
             {new Date(student.updated_at).toLocaleString('ko-KR')}
           </p>
         </div>
+      </div>
+
+      <div className="mt-8">
+        <h2 className="text-2xl font-semibold mb-4">학습일지</h2>
+        {logsLoading ? (
+          <div className="text-center py-4">로딩 중...</div>
+        ) : learningLogs.length === 0 ? (
+          <div className="text-center py-8 text-gray-500 border rounded-lg">
+            등록된 학습일지가 없습니다.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {learningLogs.map((log) => (
+              <div key={log.id} className="bg-white border rounded-lg p-4">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <h3 className="font-semibold text-lg">{log.course_name || '-'}</h3>
+                    <p className="text-sm text-gray-500">
+                      {new Date(log.date).toLocaleDateString('ko-KR')} | 작성자: {log.instructor_name || '-'}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 space-y-2">
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">학습 내용</label>
+                    <p className="text-sm mt-1 whitespace-pre-wrap">{log.content}</p>
+                  </div>
+                  {log.homework && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">숙제</label>
+                      <p className="text-sm mt-1 whitespace-pre-wrap">{log.homework}</p>
+                    </div>
+                  )}
+                  {log.notes && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">특이사항</label>
+                      <p className="text-sm mt-1 whitespace-pre-wrap">{log.notes}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="mt-6">
