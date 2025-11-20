@@ -90,11 +90,14 @@ export default function LearningLogsPage() {
     }
   };
 
-  const filteredLogs = learningLogs.filter(log =>
-    log.course_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    log.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    log.instructor_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredLogs = learningLogs.filter(log => {
+    const fullContent = (log as any).fullContent || log.content || '';
+    return (
+      log.course_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      fullContent.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      log.instructor_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  });
 
   if (authLoading) {
     return (
