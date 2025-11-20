@@ -351,28 +351,34 @@ export default function CourseDetailPage() {
                 <div className="mt-3 space-y-2">
                   <div>
                     <label className="text-sm font-medium text-gray-500">학습 내용</label>
-                    <div className="text-sm mt-1 space-y-2">
-                      <p className="whitespace-pre-wrap">{log.content}</p>
-                      {log.student_comments && Object.keys(log.student_comments).length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-gray-200 space-y-3">
-                          {Object.entries(log.student_comments).map(([studentId, comment]) => {
-                            // 학생이 볼 때는 자신의 코멘트만 표시
-                            if (user?.role === 'STUDENT' && studentId !== user.id) {
-                              return null;
-                            }
-                            // 관리자/강사가 볼 때는 학생 이름도 함께 표시
-                            const studentName = (log as any).studentsMap?.get(studentId) || '학생';
-                            return (
-                              <div key={studentId} className="text-gray-700">
-                                {user?.role !== 'STUDENT' && (
-                                  <div className="text-xs font-medium text-gray-500 mb-1">{studentName}</div>
-                                )}
-                                <p className="whitespace-pre-wrap">{comment as string}</p>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
+                    <div className="text-sm mt-1">
+                      <p className="whitespace-pre-wrap">
+                        {log.content}
+                        {log.student_comments && Object.keys(log.student_comments).length > 0 && (
+                          <>
+                            {Object.entries(log.student_comments).map(([studentId, comment]) => {
+                              // 학생이 볼 때는 자신의 코멘트만 표시
+                              if (user?.role === 'STUDENT' && studentId !== user.id) {
+                                return null;
+                              }
+                              // 관리자/강사가 볼 때는 학생 이름도 함께 표시
+                              const studentName = (log as any).studentsMap?.get(studentId) || '학생';
+                              return (
+                                <span key={studentId}>
+                                  {'\n\n'}
+                                  {user?.role !== 'STUDENT' && (
+                                    <>
+                                      {studentName}
+                                      {'\n'}
+                                    </>
+                                  )}
+                                  {comment as string}
+                                </span>
+                              );
+                            })}
+                          </>
+                        )}
+                      </p>
                     </div>
                   </div>
                   {log.homework && (

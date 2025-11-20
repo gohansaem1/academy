@@ -530,17 +530,20 @@ function StudentDetailContent() {
                   <div className="mt-3 space-y-2">
                     <div>
                       <label className="text-sm font-medium text-gray-500">학습 내용</label>
-                      <div className="text-sm mt-1 space-y-2">
-                        <p className="whitespace-pre-wrap">{log.content}</p>
-                        {log.student_comments && Object.keys(log.student_comments).length > 0 && (
-                          <div className="mt-3 pt-3 border-t border-gray-200">
-                            {Object.entries(log.student_comments).map(([studentId, comment]) => (
-                              <div key={studentId} className="text-gray-700">
-                                <p className="whitespace-pre-wrap">{comment as string}</p>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                      <div className="text-sm mt-1">
+                        <p className="whitespace-pre-wrap">
+                          {log.content}
+                          {log.student_comments && Object.keys(log.student_comments).length > 0 && (
+                            <>
+                              {Object.entries(log.student_comments).map(([studentId, comment]) => (
+                                <span key={studentId}>
+                                  {'\n\n'}
+                                  {comment as string}
+                                </span>
+                              ))}
+                            </>
+                          )}
+                        </p>
                       </div>
                     </div>
                     {log.homework && (
