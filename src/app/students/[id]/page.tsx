@@ -64,7 +64,34 @@ function StudentDetailContent() {
         .single();
 
       if (error) throw error;
-      setStudent(data);
+      
+      // 마지막 수업일 이후 자동으로 그만둔 상태로 변경
+      const { shouldUpdateStudentStatus } = await import('@/lib/utils/student-status');
+      if (shouldUpdateStudentStatus(data.status, data.last_class_date)) {
+        const { error: updateError } = await supabase
+          .from('students')
+          .update({ status: 'inactive' })
+          .eq('id', id);
+        
+        if (!updateError) {
+          // 업데이트 후 다시 조회
+          const { data: updatedData, error: updatedError } = await supabase
+            .from('students')
+            .select('*')
+            .eq('id', id)
+            .single();
+          
+          if (!updatedError) {
+            setStudent(updatedData);
+          } else {
+            setStudent(data);
+          }
+        } else {
+          setStudent(data);
+        }
+      } else {
+        setStudent(data);
+      }
     } catch (error) {
       console.error('학생 조회 오류:', error);
       alert('학생 정보를 불러오는 중 오류가 발생했습니다.');
