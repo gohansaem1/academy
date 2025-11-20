@@ -349,8 +349,8 @@ DECLARE
   end_date DATE;
   current_month_start DATE;
   current_month_end DATE;
-  first_class_date DATE;
-  last_class_date DATE;
+  first_class_date_val DATE;
+  last_class_date_val DATE;
   schedule JSONB;
   day_of_week INTEGER;
   class_days INTEGER;
@@ -360,6 +360,7 @@ DECLARE
   month_start DATE;
   month_end DATE;
   due_day INTEGER;
+  total_days_in_month INTEGER;
 BEGIN
   start_date := DATE_TRUNC('month', CURRENT_DATE - INTERVAL '3 months');
   end_date := DATE_TRUNC('month', CURRENT_DATE + INTERVAL '1 month') - INTERVAL '1 day';
@@ -374,8 +375,8 @@ BEGIN
     SELECT * INTO course_record FROM courses WHERE id = enrollment_record.course_id;
     
     student_record := enrollment_record;
-    first_class_date := enrollment_record.first_class_date;
-    last_class_date := enrollment_record.last_class_date;
+    first_class_date_val := enrollment_record.first_class_date;
+    last_class_date_val := enrollment_record.last_class_date;
     due_day := enrollment_record.payment_due_day;
     IF due_day IS NULL THEN
       due_day := 25;
