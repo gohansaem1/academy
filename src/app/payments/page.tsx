@@ -39,6 +39,8 @@ interface PaymentWithStudent extends Payment {
   student_payment_due_day?: number | null;
 }
 
+type PaymentFilter = 'all' | 'overdue' | 'confirmed' | 'cancelled';
+
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<PaymentWithStudent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,6 +51,7 @@ export default function PaymentsPage() {
   });
   const [selectedPayments, setSelectedPayments] = useState<Set<string>>(new Set());
   const [editingPayments, setEditingPayments] = useState<Record<string, { payment_method?: string; payment_date?: string; status?: string }>>({});
+  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
 
   useEffect(() => {
     fetchPayments();
@@ -322,10 +325,36 @@ export default function PaymentsPage() {
       ...payment,
       dueStatus: getPaymentDueStatus(payment),
     }))
-    .filter(payment =>
-      payment.student_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.course_name?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    .filter(payment => {
+      // 검색어 필터
+      const matchesSearch = payment.student_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        payment.course_name?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      if (!matchesSearch) return false;
+
+      // 상태 필터
+      switch (paymentFilter) {
+        case 'overdue':
+          // 미납: pending 상태이거나 결제일이 지났지만 아직 완료되지 않은 경우
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const paymentDate = new Date(payment.payment_date);
+          paymentDate.setHours(0, 0, 0, 0);
+          return (payment.status === 'pending' || 
+                  (paymentDate < today && payment.status !== 'completed' && payment.status !== 'confirmed')) &&
+                 payment.status !== 'cancelled';
+        case 'confirmed':
+          // 입금확인: confirmed 또는 completed 상태
+          return payment.status === 'confirmed' || payment.status === 'completed';
+        case 'cancelled':
+          // 취소: cancelled 상태
+          return payment.status === 'cancelled';
+        case 'all':
+        default:
+          // 전체: 취소 제외
+          return payment.status !== 'cancelled';
+      }
+    });
 
   // 편집 중인 항목이 변경되었는지 확인
   const hasChanges = (paymentId: string): boolean => {
@@ -460,6 +489,21 @@ export default function PaymentsPage() {
               onChange={(e) => setSelectedMonth(e.target.value)}
               className="w-48"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-700">
+              필터
+            </label>
+            <select
+              value={paymentFilter}
+              onChange={(e) => setPaymentFilter(e.target.value as PaymentFilter)}
+              className="flex h-10 w-40 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            >
+              <option value="all">전체</option>
+              <option value="overdue">미납</option>
+              <option value="confirmed">입금확인</option>
+              <option value="cancelled">취소</option>
+            </select>
           </div>
           <Input
             placeholder="학생명 또는 수업명으로 검색..."
