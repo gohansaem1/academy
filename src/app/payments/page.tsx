@@ -605,21 +605,39 @@ export default function PaymentsPage() {
     let totalRefundAmount = 0;
     
     try {
+      // 선택된 달 계산
+      const [selectedYear, selectedMonthNum] = showAllPeriod 
+        ? [null, null]
+        : selectedMonth.split('-').map(Number);
+      
       // 그만둔 학생 조회 (마지막 수업일이 있는 학생만)
-      const { data: inactiveStudents, error: studentsError } = await supabase
+      let query = supabase
         .from('students')
         .select(`
           id,
           last_class_date,
-          course_enrollments(
+          course_enrollments!inner(
             course_id,
-            courses(tuition_fee)
+            courses!inner(tuition_fee)
           )
         `)
         .eq('status', 'inactive')
         .not('last_class_date', 'is', null);
       
-      if (!studentsError && inactiveStudents) {
+      // 전체 기간이 아닐 때는 마지막 수업일이 선택된 달에 있는 학생만 조회
+      if (!showAllPeriod && selectedYear && selectedMonthNum) {
+        const monthStart = new Date(selectedYear, selectedMonthNum - 1, 1);
+        const monthEnd = new Date(selectedYear, selectedMonthNum, 0);
+        query = query
+          .gte('last_class_date', monthStart.toISOString().split('T')[0])
+          .lte('last_class_date', monthEnd.toISOString().split('T')[0]);
+      }
+      
+      const { data: inactiveStudents, error: studentsError } = await query;
+      
+      if (studentsError) {
+        console.error('환불 금액 계산 - 학생 조회 오류:', studentsError);
+      } else if (inactiveStudents) {
         inactiveStudents.forEach((student: any) => {
           if (!student.last_class_date) return;
           
@@ -627,16 +645,7 @@ export default function PaymentsPage() {
           const lastClassYear = lastClassDate.getFullYear();
           const lastClassMonth = lastClassDate.getMonth() + 1;
           
-          // 마지막 수업일이 선택된 달에 포함되는지 확인
-          let shouldInclude = false;
-          if (showAllPeriod) {
-            shouldInclude = true;
-          } else {
-            const [selectedYear, selectedMonthNum] = selectedMonth.split('-').map(Number);
-            shouldInclude = lastClassYear === selectedYear && lastClassMonth === selectedMonthNum;
-          }
-          
-          if (shouldInclude && student.course_enrollments) {
+          if (student.course_enrollments && Array.isArray(student.course_enrollments)) {
             // 학생이 수강하는 모든 수업에 대해 환불 금액 계산
             student.course_enrollments.forEach((enrollment: any) => {
               const tuitionFee = enrollment.courses?.tuition_fee;
