@@ -196,7 +196,8 @@ export default function AttendanceStatisticsPage() {
       allStudents?.forEach(student => {
         const studentAttendance = attendanceByStudent?.filter(a => a.student_id === student.id) || [];
         const studentTotal = studentAttendance.length;
-        const studentPresent = studentAttendance.filter(a => a.status === 'present' || a.status === 'late').length;
+        // 출석률 계산: 결석만 제외, 출석/지각/조퇴는 모두 출석으로 간주
+        const studentPresent = studentAttendance.filter(a => a.status !== 'absent').length;
         const studentAbsent = studentAttendance.filter(a => a.status === 'absent').length;
         const studentRate = studentTotal > 0 ? (studentPresent / studentTotal) * 100 : 100;
 
