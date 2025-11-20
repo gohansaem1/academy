@@ -14,8 +14,6 @@ const DAYS_OF_WEEK = ['일요일', '월요일', '화요일', '수요일', '목�
 export default function NewCoursePage() {
   const { user, loading: authLoading } = useAuth('ADMIN');
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [instructors, setInstructors] = useState<Instructor[]>([]);
   
   if (authLoading) {
     return (
@@ -27,6 +25,9 @@ export default function NewCoursePage() {
       </div>
     );
   }
+
+  const [saving, setSaving] = useState(false);
+  const [instructors, setInstructors] = useState<Instructor[]>([]);
 
   const [formData, setFormData] = useState<CourseFormData>({
     name: '',
@@ -93,7 +94,7 @@ export default function NewCoursePage() {
     if (!validate()) return;
 
     try {
-      setLoading(true);
+      setSaving(true);
       const { error } = await supabase
         .from('courses')
         .insert([{
@@ -115,7 +116,7 @@ export default function NewCoursePage() {
       console.error('수업 등록 오류:', error);
       alert('수업 등록 중 오류가 발생했습니다.');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
