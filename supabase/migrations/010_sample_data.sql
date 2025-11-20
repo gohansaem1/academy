@@ -215,14 +215,15 @@ BEGIN
   END LOOP;
 END $$;
 
--- 한 달치 출석 데이터 생성
--- 현재 달의 각 수업 스케줄에 맞춰 출석 데이터 생성
+-- 출석 데이터 생성 (지난 달 + 이번 달)
 DO $$
 DECLARE
   course_record RECORD;
   schedule_item JSONB;
   student_record RECORD;
   class_date DATE;
+  last_month_start DATE;
+  last_month_end DATE;
   current_month_start DATE;
   current_month_end DATE;
   day_of_week INTEGER;
@@ -231,6 +232,11 @@ DECLARE
   selected_status TEXT;
   random_val NUMERIC;
 BEGIN
+  -- 지난 달 범위
+  last_month_start := DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month';
+  last_month_end := (DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 day')::DATE;
+  
+  -- 이번 달 범위
   current_month_start := DATE_TRUNC('month', CURRENT_DATE);
   current_month_end := (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month' - INTERVAL '1 day')::DATE;
   
@@ -246,7 +252,39 @@ BEGIN
       FOR schedule_item IN SELECT * FROM jsonb_array_elements(course_record.schedule) LOOP
         day_of_week := (schedule_item->>'day_of_week')::INTEGER;
         
-        -- 이번 달의 해당 요일 찾기
+        -- 지난 달 출석 데이터 생성
+        class_date := last_month_start;
+        WHILE class_date <= last_month_end LOOP
+          -- 해당 요일인지 확인 (0=일요일, 6=토요일)
+          IF EXTRACT(DOW FROM class_date) = day_of_week THEN
+            -- 랜덤하게 출석 상태 결정
+            random_val := RANDOM();
+            IF random_val < 0.7 THEN
+              selected_status := 'present';
+            ELSIF random_val < 0.8 THEN
+              selected_status := 'late';
+            ELSIF random_val < 0.9 THEN
+              selected_status := 'early';
+            ELSE
+              selected_status := 'absent';
+            END IF;
+            
+            -- 출석 데이터 삽입
+            INSERT INTO attendance (course_id, student_id, date, status, created_at)
+            VALUES (
+              course_record.id,
+              student_record.id,
+              class_date,
+              selected_status,
+              NOW()
+            )
+            ON CONFLICT (course_id, student_id, date) DO NOTHING;
+          END IF;
+          
+          class_date := class_date + INTERVAL '1 day';
+        END LOOP;
+        
+        -- 이번 달 출석 데이터 생성
         class_date := current_month_start;
         WHILE class_date <= current_month_end LOOP
           -- 해당 요일인지 확인 (0=일요일, 6=토요일)
@@ -282,12 +320,14 @@ BEGIN
   END LOOP;
 END $$;
 
--- 한 달치 학습일지 생성 (학생별 개별 코멘트 포함)
+-- 학습일지 생성 (지난 달 + 이번 달, 학생별 개별 코멘트 포함)
 DO $$
 DECLARE
   course_record RECORD;
   schedule_item JSONB;
   class_date DATE;
+  last_month_start DATE;
+  last_month_end DATE;
   current_month_start DATE;
   current_month_end DATE;
   day_of_week INTEGER;
@@ -299,6 +339,11 @@ DECLARE
   random_val NUMERIC;
   log_id UUID;
 BEGIN
+  -- 지난 달 범위
+  last_month_start := DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month';
+  last_month_end := (DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 day')::DATE;
+  
+  -- 이번 달 범위
   current_month_start := DATE_TRUNC('month', CURRENT_DATE);
   current_month_end := (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month' - INTERVAL '1 day')::DATE;
   
@@ -308,7 +353,76 @@ BEGIN
     FOR schedule_item IN SELECT * FROM jsonb_array_elements(course_record.schedule) LOOP
       day_of_week := (schedule_item->>'day_of_week')::INTEGER;
       
-      -- 이번 달의 해당 요일 찾기
+      -- 지난 달 학습일지 생성
+      class_date := last_month_start;
+      WHILE class_date <= last_month_end LOOP
+        -- 해당 요일인지 확인
+        IF EXTRACT(DOW FROM class_date) = day_of_week THEN
+          -- 학습일지 내용 생성
+          log_content := course_record.name || ' 수업이 진행되었습니다. ' || 
+                         CASE course_record.subject 
+                           WHEN '영어' THEN '영어 단어와 문법을 학습하고 회화 연습을 진행했습니다.'
+                           WHEN '미술' THEN '창의적인 미술 활동을 통해 표현력을 기르는 시간이었습니다.'
+                           ELSE '수업이 진행되었습니다.'
+                         END;
+          
+          homework_content := CASE course_record.subject
+            WHEN '영어' THEN '다음 수업까지 단어 암기 및 문법 연습 문제 풀이'
+            WHEN '미술' THEN '다음 수업 준비물: 색연필, 스케치북'
+            ELSE '과제 없음'
+          END;
+          
+          -- 학생별 개별 코멘트 생성
+          student_comments := '{}'::jsonb;
+          FOR student_record IN 
+            SELECT s.* FROM students s
+            INNER JOIN course_enrollments ce ON s.id = ce.student_id
+            WHERE ce.course_id = course_record.id
+          LOOP
+            -- 60% 확률로 코멘트 추가
+            random_val := RANDOM();
+            IF random_val < 0.6 THEN
+              comment_texts := ARRAY[
+                student_record.name || ' 학생이 오늘 수업에 적극적으로 참여했습니다.',
+                student_record.name || ' 학생의 이해도가 좋아 보입니다.',
+                student_record.name || ' 학생이 집중력 있게 수업에 임했습니다.',
+                student_record.name || ' 학생의 발표가 인상적이었습니다.',
+                student_record.name || ' 학생이 오늘 배운 내용을 잘 이해한 것 같습니다.',
+                student_record.name || ' 학생이 수업 중 질문을 잘 했습니다.',
+                student_record.name || ' 학생의 실력 향상이 눈에 띕니다.',
+                student_record.name || ' 학생이 오늘 수업에서 좋은 아이디어를 제시했습니다.',
+                student_record.name || ' 학생이 수업 내용을 잘 정리하고 있습니다.',
+                student_record.name || ' 학생의 창의적인 접근이 돋보였습니다.'
+              ];
+              student_comments := student_comments || jsonb_build_object(
+                student_record.id::TEXT,
+                comment_texts[1 + floor(RANDOM() * array_length(comment_texts, 1))::INTEGER]
+              );
+            END IF;
+          END LOOP;
+          
+          -- 학습일지 삽입
+          INSERT INTO learning_logs (course_id, date, content, homework, notes, instructor_id, student_comments, created_at, updated_at)
+          VALUES (
+            course_record.id,
+            class_date,
+            log_content,
+            homework_content,
+            '수업 진행 상황 양호',
+            course_record.instructor_id,
+            CASE WHEN student_comments::text != '{}' THEN student_comments ELSE NULL END,
+            NOW(),
+            NOW()
+          )
+          ON CONFLICT (course_id, date) DO UPDATE SET
+            student_comments = EXCLUDED.student_comments
+          RETURNING id INTO log_id;
+        END IF;
+        
+        class_date := class_date + INTERVAL '1 day';
+      END LOOP;
+      
+      -- 이번 달 학습일지 생성
       class_date := current_month_start;
       WHILE class_date <= current_month_end LOOP
         -- 해당 요일인지 확인
