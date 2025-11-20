@@ -612,8 +612,8 @@ export default function PaymentsPage() {
         if (showAllPeriod) {
           shouldInclude = true;
         } else {
-          const [selectedYear, selectedMonth] = selectedMonth.split('-').map(Number);
-          shouldInclude = lastClassYear === selectedYear && lastClassMonth === selectedMonth;
+          const [selectedYear, selectedMonthNum] = selectedMonth.split('-').map(Number);
+          shouldInclude = lastClassYear === selectedYear && lastClassMonth === selectedMonthNum;
         }
         
         if (shouldInclude) {
