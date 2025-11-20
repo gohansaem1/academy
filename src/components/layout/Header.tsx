@@ -54,9 +54,18 @@ export default function Header() {
                 </Link>
               ))}
               <div className="flex items-center gap-4 ml-auto">
-                <span className="text-sm text-gray-600">
-                  {user.name} ({getRoleLabel(user.role)})
-                </span>
+                {user.role === 'ADMIN' ? (
+                  <Link
+                    href="/admin/settings"
+                    className="text-sm text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
+                  >
+                    {user.name} ({getRoleLabel(user.role)})
+                  </Link>
+                ) : (
+                  <span className="text-sm text-gray-600">
+                    {user.name} ({getRoleLabel(user.role)})
+                  </span>
+                )}
                 <Button variant="outline" size="sm" onClick={handleSignOut}>
                   로그아웃
                 </Button>
