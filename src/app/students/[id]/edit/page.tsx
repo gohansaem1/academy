@@ -94,20 +94,6 @@ export default function EditStudentPage() {
     try {
       setSaving(true);
       
-      // 현재 학생 정보 조회 (상태 변경 확인용)
-      const { data: currentStudent } = await supabase
-        .from('students')
-        .select('status')
-        .eq('id', params.id)
-        .single();
-      
-      // 현재 학생 정보 조회 (마지막 수업일 확인용)
-      const { data: currentStudent } = await supabase
-        .from('students')
-        .select('last_class_date')
-        .eq('id', params.id)
-        .single();
-      
       const updateData: any = {
         name: formData.name,
         phone: formData.phone,
@@ -119,8 +105,8 @@ export default function EditStudentPage() {
         first_class_date: formData.first_class_date || null,
       };
       
-      // 마지막 수업일이 변경되었고, 현재 날짜보다 이전이면 자동으로 그만둔 상태로 변경됨
       // 상태는 자동으로 업데이트되므로 수동 변경 불가
+      // 마지막 수업일은 별도 필드에서 수정 가능
       
       const { error } = await supabase
         .from('students')
