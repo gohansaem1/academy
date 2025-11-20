@@ -87,6 +87,7 @@ function StudentDetailContent() {
 
       if (!enrollments || enrollments.length === 0) {
         setLearningLogs([]);
+        setLogsLoading(false);
         return;
       }
 
@@ -97,26 +98,29 @@ function StudentDetailContent() {
         .from('learning_logs')
         .select(`
           *,
-          courses(name, subject),
-          instructors(name)
+          courses:course_id (
+            name,
+            subject
+          ),
+          instructors:instructor_id (
+            name
+          )
         `)
         .in('course_id', courseIds)
         .order('date', { ascending: false })
         .limit(20);
 
-      if (error) throw error;
+      if (error) {
+        console.error('학습일지 조회 오류:', error);
+        throw error;
+      }
 
-      // 학생 정보 가져오기 (코멘트 표시용)
-      const studentId = params.id as string;
-      
+      // 학생 상세 페이지에서는 항상 해당 학생의 코멘트만 표시
       const logsWithNames = (data || []).map((log: any) => {
-        // 학생이 자신의 학습일지를 볼 때는 자신의 코멘트만 표시
-        let filteredComments = log.student_comments || {};
-        if (user?.role === 'STUDENT' && params.id) {
-          // 현재 로그인한 학생의 코멘트만 필터링
-          filteredComments = log.student_comments?.[studentId] 
-            ? { [studentId]: log.student_comments[studentId] }
-            : {};
+        // 해당 학생의 코멘트만 필터링
+        let filteredComments = {};
+        if (log.student_comments && log.student_comments[studentId]) {
+          filteredComments = { [studentId]: log.student_comments[studentId] };
         }
 
         return {
@@ -124,13 +128,13 @@ function StudentDetailContent() {
           course_name: log.courses?.name,
           instructor_name: log.instructors?.name,
           student_comments: filteredComments,
-          currentStudentId: studentId, // 현재 학생 ID 저장
         };
       });
 
       setLearningLogs(logsWithNames);
     } catch (error) {
       console.error('학습일지 조회 오류:', error);
+      alert('학습일지를 불러오는 중 오류가 발생했습니다.');
     } finally {
       setLogsLoading(false);
     }
@@ -545,17 +549,10 @@ function StudentDetailContent() {
                         <label className="text-sm font-medium text-gray-500">개별 코멘트</label>
                         <div className="mt-2 space-y-2">
                           {Object.entries(log.student_comments).map(([studentId, comment]) => {
-                            // 학생이 볼 때는 자신의 코멘트만 표시
-                            if (user?.role === 'STUDENT' && studentId !== params.id) {
-                              return null;
-                            }
-                            // 관리자/강사가 볼 때는 학생 이름도 함께 표시
+                            // 학생 상세 페이지에서는 이미 해당 학생의 코멘트만 필터링되어 있음
                             const studentName = student?.id === studentId ? student.name : '학생';
                             return (
                               <div key={studentId} className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                {user?.role !== 'STUDENT' && (
-                                  <div className="text-xs font-medium text-blue-700 mb-1">{studentName}</div>
-                                )}
                                 <p className="text-sm whitespace-pre-wrap">{comment as string}</p>
                               </div>
                             );
