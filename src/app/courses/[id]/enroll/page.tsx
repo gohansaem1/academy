@@ -108,9 +108,9 @@ export default function EnrollStudentPage() {
           student_id: studentId,
           course_id: params.id as string,
           amount: courseData.tuition_fee,
-          payment_method: 'transfer', // 기본값: 계좌이체
+          payment_method: 'card', // 기본값: 카드
           payment_date: paymentDate.toISOString().split('T')[0],
-          status: 'pending', // 기본값: 대기
+          status: 'pending', // 기본값: 미납
         }]);
 
       if (paymentError) {

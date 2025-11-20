@@ -338,11 +338,17 @@ export default function PaymentsPage() {
     if (edits.payment_method !== undefined && edits.payment_method !== payment.payment_method) return true;
     if (edits.payment_date !== undefined && edits.payment_date !== payment.payment_date) return true;
     if (edits.status !== undefined) {
-      const currentStatus = payment.status === 'completed' || payment.status === 'confirmed' ? 'confirmed' : 'pending';
+      // 현재 상태를 pending 또는 confirmed로 변환
+      const currentStatus = (payment.status === 'completed' || payment.status === 'confirmed') ? 'confirmed' : 'pending';
       if (edits.status !== currentStatus) return true;
     }
     
     return false;
+  };
+
+  // 결제 상태를 표시용으로 변환 (pending -> pending, confirmed/completed -> confirmed)
+  const getDisplayStatus = (payment: PaymentWithStudent): 'pending' | 'confirmed' => {
+    return (payment.status === 'completed' || payment.status === 'confirmed') ? 'confirmed' : 'pending';
   };
 
   // 통계 계산
@@ -367,14 +373,16 @@ export default function PaymentsPage() {
       .filter(p => p.status === 'completed' || p.status === 'confirmed')
       .reduce((sum, p) => sum + p.amount, 0);
 
-    // 해당 달 미납액 (결제일이 지났지만 아직 완료되지 않은 결제)
+    // 해당 달 미납액 (결제일이 지났지만 아직 완료되지 않은 결제, 또는 상태가 pending인 결제)
     const overdueAmount = currentMonthPayments
       .filter(p => {
         const paymentDate = new Date(p.payment_date);
         paymentDate.setHours(0, 0, 0, 0);
-        return paymentDate < today &&
+        // 결제일이 지났거나 상태가 pending인 경우 미납으로 간주
+        return (paymentDate < today || p.status === 'pending') &&
                p.status !== 'completed' && 
-               p.status !== 'confirmed';
+               p.status !== 'confirmed' &&
+               p.status !== 'cancelled';
       })
       .reduce((sum, p) => sum + p.amount, 0);
 
@@ -563,7 +571,7 @@ export default function PaymentsPage() {
                         <select
                           value={editingPayments[payment.id]?.status !== undefined
                             ? editingPayments[payment.id].status!
-                            : (payment.status === 'completed' || payment.status === 'confirmed' ? 'confirmed' : 'pending')}
+                            : getDisplayStatus(payment)}
                           onChange={(e) => handleEditPayment(payment.id, 'status', e.target.value)}
                           className="flex h-8 w-32 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                         >
