@@ -22,6 +22,15 @@ export default function NewPaymentPage() {
   const [saving, setSaving] = useState(false);
   const [courses, setCourses] = useState<Course[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [formData, setFormData] = useState<PaymentFormData>({
+    student_id: '',
+    course_id: '',
+    amount: 0,
+    payment_method: 'cash',
+    payment_date: new Date().toISOString().split('T')[0],
+    status: 'pending',
+  });
+  const [errors, setErrors] = useState<Partial<Record<keyof PaymentFormData, string>>>({});
   
   if (authLoading) {
     return (
@@ -33,15 +42,6 @@ export default function NewPaymentPage() {
       </div>
     );
   }
-  const [formData, setFormData] = useState<PaymentFormData>({
-    student_id: '',
-    course_id: '',
-    amount: 0,
-    payment_method: 'cash',
-    payment_date: new Date().toISOString().split('T')[0],
-    status: 'pending',
-  });
-  const [errors, setErrors] = useState<Partial<Record<keyof PaymentFormData, string>>>({});
 
   useEffect(() => {
     fetchCourses();

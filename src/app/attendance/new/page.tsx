@@ -14,6 +14,15 @@ export default function NewAttendancePage() {
   const { user, loading: authLoading } = useAuth('TEACHER');
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [formData, setFormData] = useState<AttendanceFormData>({
+    course_id: '',
+    student_id: '',
+    date: new Date().toISOString().split('T')[0],
+    status: 'present',
+  });
+  const [errors, setErrors] = useState<Partial<Record<keyof AttendanceFormData, string>>>({});
 
   if (authLoading) {
     return (
@@ -25,15 +34,6 @@ export default function NewAttendancePage() {
       </div>
     );
   }
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [formData, setFormData] = useState<AttendanceFormData>({
-    course_id: '',
-    student_id: '',
-    date: new Date().toISOString().split('T')[0],
-    status: 'present',
-  });
-  const [errors, setErrors] = useState<Partial<Record<keyof AttendanceFormData, string>>>({});
 
   useEffect(() => {
     fetchCourses();

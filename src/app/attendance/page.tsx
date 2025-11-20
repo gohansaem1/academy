@@ -61,7 +61,7 @@ export default function AttendancePage() {
     }
   };
 
-  const handleStatusChange = async (id: string, newStatus: 'present' | 'late' | 'absent') => {
+  const handleStatusChange = async (id: string, newStatus: 'present' | 'late' | 'absent' | 'early') => {
     try {
       const { error } = await supabase
         .from('attendance')
