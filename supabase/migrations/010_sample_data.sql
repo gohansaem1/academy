@@ -184,6 +184,7 @@ DECLARE
   course_record RECORD;
   payment_date DATE;
   due_day INTEGER;
+  last_month_payment_date DATE;
 BEGIN
   FOR enrollment_record IN SELECT * FROM course_enrollments LOOP
     -- 학생 정보 조회
@@ -195,13 +196,29 @@ BEGIN
     -- 수업 정보 조회
     SELECT tuition_fee INTO course_record FROM courses WHERE id = enrollment_record.course_id;
     
-    -- 결제일 계산 (이번 달 결제일)
+    -- 지난 달 결제일 계산
+    last_month_payment_date := DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month' + (due_day - 1) * INTERVAL '1 day';
+    
+    -- 지난 달 결제 항목 생성
+    INSERT INTO payments (student_id, course_id, amount, payment_method, payment_date, status, created_at)
+    VALUES (
+      enrollment_record.student_id,
+      enrollment_record.course_id,
+      course_record.tuition_fee,
+      'card',
+      last_month_payment_date,
+      CASE WHEN RANDOM() < 0.8 THEN 'confirmed' ELSE 'pending' END,
+      NOW()
+    )
+    ON CONFLICT DO NOTHING;
+    
+    -- 이번 달 결제일 계산
     payment_date := DATE_TRUNC('month', CURRENT_DATE) + (due_day - 1) * INTERVAL '1 day';
     IF payment_date < CURRENT_DATE THEN
       payment_date := payment_date + INTERVAL '1 month';
     END IF;
     
-    -- 결제 항목 생성
+    -- 이번 달 결제 항목 생성
     INSERT INTO payments (student_id, course_id, amount, payment_method, payment_date, status, created_at)
     VALUES (
       enrollment_record.student_id,
@@ -211,7 +228,8 @@ BEGIN
       payment_date,
       CASE WHEN RANDOM() < 0.7 THEN 'confirmed' ELSE 'pending' END,
       NOW()
-    );
+    )
+    ON CONFLICT DO NOTHING;
   END LOOP;
 END $$;
 
