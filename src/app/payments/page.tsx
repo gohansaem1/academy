@@ -1044,10 +1044,47 @@ export default function PaymentsPage() {
                             size="sm"
                             onClick={async () => {
                               try {
-                                // 환불 상태 업데이트
+                                const newStatus = editingRefundStatus[refundRow.id];
+                                
+                                // DB에 환불 상태 저장 또는 업데이트
+                                const refundData = {
+                                  student_id: refundRow.student_id,
+                                  course_id: refundRow.course_id,
+                                  amount: refundRow.amount,
+                                  last_class_date: refundRow.last_class_date,
+                                  status: newStatus,
+                                };
+                                
+                                // 기존 환불 레코드 확인
+                                const { data: existingRefund, error: checkError } = await supabase
+                                  .from('refunds')
+                                  .select('id')
+                                  .eq('student_id', refundRow.student_id)
+                                  .eq('course_id', refundRow.course_id)
+                                  .eq('last_class_date', refundRow.last_class_date)
+                                  .maybeSingle();
+                                
+                                if (existingRefund && !checkError) {
+                                  // 기존 레코드 업데이트
+                                  const { error: updateError } = await supabase
+                                    .from('refunds')
+                                    .update({ status: newStatus })
+                                    .eq('id', existingRefund.id);
+                                  
+                                  if (updateError) throw updateError;
+                                } else {
+                                  // 새 레코드 생성
+                                  const { error: insertError } = await supabase
+                                    .from('refunds')
+                                    .insert([refundData]);
+                                  
+                                  if (insertError) throw insertError;
+                                }
+                                
+                                // 로컬 상태 업데이트
                                 const updatedRefundRows = refundRows.map(row => 
                                   row.id === refundRow.id 
-                                    ? { ...row, status: editingRefundStatus[refundRow.id] }
+                                    ? { ...row, status: newStatus }
                                     : row
                                 );
                                 setRefundRows(updatedRefundRows);
