@@ -728,6 +728,7 @@ export default function PaymentsPage() {
                     amount: refundAmount,
                     last_class_date: student.last_class_date,
                     payment_date: lastClassDate.toISOString().split('T')[0], // 마지막 수업일을 결제일로 사용
+                    status: 'pending', // 기본값: 미지급
                   });
                 }
               }
@@ -997,9 +998,49 @@ export default function PaymentsPage() {
                     <TableCell className="text-gray-500">환불</TableCell>
                     <TableCell>{refundRow.payment_date}</TableCell>
                     <TableCell>
-                      <span className="px-2 py-1 rounded text-xs bg-red-100 text-red-800">
-                        환불
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={editingRefundStatus[refundRow.id] !== undefined
+                            ? editingRefundStatus[refundRow.id]
+                            : (refundRow.status || 'pending')}
+                          onChange={(e) => {
+                            setEditingRefundStatus({
+                              ...editingRefundStatus,
+                              [refundRow.id]: e.target.value as 'pending' | 'confirmed',
+                            });
+                          }}
+                          className="flex h-8 w-32 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                        >
+                          <option value="pending">미지급</option>
+                          <option value="confirmed">환불확인</option>
+                        </select>
+                        {editingRefundStatus[refundRow.id] !== undefined && (
+                          <Button
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                // 환불 상태 업데이트
+                                const updatedRefundRows = refundRows.map(row => 
+                                  row.id === refundRow.id 
+                                    ? { ...row, status: editingRefundStatus[refundRow.id] }
+                                    : row
+                                );
+                                setRefundRows(updatedRefundRows);
+                                
+                                // 편집 상태 초기화
+                                const newEditingStatus = { ...editingRefundStatus };
+                                delete newEditingStatus[refundRow.id];
+                                setEditingRefundStatus(newEditingStatus);
+                              } catch (error) {
+                                console.error('환불 상태 수정 오류:', error);
+                                alert('환불 상태 수정 중 오류가 발생했습니다.');
+                              }
+                            }}
+                          >
+                            확인
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
