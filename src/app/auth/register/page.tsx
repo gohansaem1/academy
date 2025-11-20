@@ -25,6 +25,25 @@ export default function RegisterPage() {
     setError('');
     setLoading(true);
 
+    // 비밀번호 유효성 검사
+    if (formData.password.length < 8) {
+      setError('비밀번호는 최소 8자 이상이어야 합니다.');
+      setLoading(false);
+      return;
+    }
+
+    // 비밀번호 복잡도 검사
+    const hasUpperCase = /[A-Z]/.test(formData.password);
+    const hasLowerCase = /[a-z]/.test(formData.password);
+    const hasNumber = /[0-9]/.test(formData.password);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(formData.password);
+
+    if (!hasUpperCase || !hasLowerCase || !hasNumber || !hasSpecialChar) {
+      setError('비밀번호는 대문자, 소문자, 숫자, 특수문자를 각각 하나 이상 포함해야 합니다.');
+      setLoading(false);
+      return;
+    }
+
     try {
       // Supabase Auth에 사용자 등록
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -94,8 +113,9 @@ export default function RegisterPage() {
           value={formData.password}
           onChange={(e) => setFormData({ ...formData, password: e.target.value })}
           required
-          minLength={6}
+          minLength={8}
           autoComplete="new-password"
+          helperText="최소 8자 이상, 대문자/소문자/숫자/특수문자 포함"
         />
 
         <Input

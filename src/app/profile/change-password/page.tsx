@@ -86,8 +86,19 @@ function ChangePasswordContent() {
     setSuccess(false);
 
     // 유효성 검사
-    if (formData.newPassword.length < 6) {
-      setError('새 비밀번호는 최소 6자 이상이어야 합니다.');
+    if (formData.newPassword.length < 8) {
+      setError('새 비밀번호는 최소 8자 이상이어야 합니다.');
+      return;
+    }
+
+    // 비밀번호 복잡도 검사
+    const hasUpperCase = /[A-Z]/.test(formData.newPassword);
+    const hasLowerCase = /[a-z]/.test(formData.newPassword);
+    const hasNumber = /[0-9]/.test(formData.newPassword);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(formData.newPassword);
+
+    if (!hasUpperCase || !hasLowerCase || !hasNumber || !hasSpecialChar) {
+      setError('비밀번호는 대문자, 소문자, 숫자, 특수문자를 각각 하나 이상 포함해야 합니다.');
       return;
     }
 
@@ -238,7 +249,7 @@ function ChangePasswordContent() {
           minLength={6}
           autoComplete="new-password"
           disabled={loading || success}
-          helperText="최소 6자 이상 입력해주세요"
+          helperText="최소 8자 이상, 대문자/소문자/숫자/특수문자 포함"
         />
 
         <Input
