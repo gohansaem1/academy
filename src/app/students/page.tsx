@@ -28,38 +28,22 @@ export default function StudentsPage() {
 
       if (error) throw error;
       
-      // 마지막 수업일 이후 자동으로 그만둔 상태로 변경
-      const { shouldUpdateStudentStatus } = await import('@/lib/utils/student-status');
-      const studentsToUpdate: Array<{ id: string }> = [];
+      // 마지막 수업일이 현재 날짜보다 이전이면 자동으로 그만둔 상태로 변경
+      const { autoUpdateStudentStatusIfNeeded } = await import('@/lib/utils/student-status');
+      const updatePromises = (data || []).map((student: any) =>
+        autoUpdateStudentStatusIfNeeded(student.id, student.status, student.last_class_date)
+      );
       
-      (data || []).forEach((student: any) => {
-        if (shouldUpdateStudentStatus(student.status, student.last_class_date)) {
-          studentsToUpdate.push({ id: student.id });
-        }
-      });
+      await Promise.all(updatePromises);
       
-      // 상태 업데이트가 필요한 학생들 일괄 업데이트
-      if (studentsToUpdate.length > 0) {
-        await Promise.all(
-          studentsToUpdate.map(student => 
-            supabase
-              .from('students')
-              .update({ status: 'inactive' })
-              .eq('id', student.id)
-          )
-        );
-        
-        // 업데이트 후 다시 조회
-        const { data: updatedData, error: updatedError } = await supabase
-          .from('students')
-          .select('*')
-          .order('created_at', { ascending: false });
-        
-        if (!updatedError) {
-          setStudents(updatedData || []);
-        } else {
-          setStudents(data || []);
-        }
+      // 업데이트 후 다시 조회
+      const { data: updatedData, error: updatedError } = await supabase
+        .from('students')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (!updatedError) {
+        setStudents(updatedData || []);
       } else {
         setStudents(data || []);
       }

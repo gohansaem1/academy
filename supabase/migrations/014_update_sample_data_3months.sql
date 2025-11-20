@@ -105,7 +105,7 @@ BEGIN
   END LOOP;
 END $$;
 
--- 일부 학생을 그만둔 상태로 변경 (마지막 수업일 설정)
+-- 일부 학생에게 마지막 수업일 설정 (마지막 수업일이 현재보다 이전이면 자동으로 그만둔 상태로 변경됨)
 DO $$
 DECLARE
   student_record RECORD;
@@ -114,20 +114,40 @@ DECLARE
   one_month_ago DATE := CURRENT_DATE - INTERVAL '1 month';
   two_months_ago DATE := CURRENT_DATE - INTERVAL '2 months';
 BEGIN
-  -- 10명의 학생을 그만둔 상태로 변경
+  -- 10명의 학생에게 마지막 수업일 설정
   FOR student_record IN 
     SELECT id, first_class_date 
     FROM students 
     ORDER BY RANDOM() 
     LIMIT 10
   LOOP
-    -- 마지막 수업일: 1-2개월 전 랜덤
-    last_class_date_val := two_months_ago + (RANDOM() * (one_month_ago - two_months_ago))::INTEGER;
-    
-    UPDATE students
-    SET status = 'inactive',
-        last_class_date = last_class_date_val
-    WHERE id = student_record.id;
+    -- 마지막 수업일: 첫 수업일 이후부터 1-2개월 전까지 랜덤
+    -- 첫 수업일보다 이전이 되지 않도록 보장
+    DECLARE
+      min_date DATE;
+      max_date DATE;
+    BEGIN
+      -- 첫 수업일이 있으면 첫 수업일 이후, 없으면 2개월 전부터
+      IF student_record.first_class_date IS NOT NULL THEN
+        min_date := student_record.first_class_date;
+      ELSE
+        min_date := two_months_ago;
+      END IF;
+      
+      max_date := one_month_ago;
+      
+      -- 마지막 수업일이 첫 수업일보다 이전이 되지 않도록
+      IF min_date > max_date THEN
+        min_date := max_date;
+      END IF;
+      
+      last_class_date_val := min_date + (RANDOM() * (max_date - min_date))::INTEGER;
+      
+      -- 마지막 수업일만 설정 (상태는 자동으로 업데이트됨)
+      UPDATE students
+      SET last_class_date = last_class_date_val
+      WHERE id = student_record.id;
+    END;
   END LOOP;
 END $$;
 
