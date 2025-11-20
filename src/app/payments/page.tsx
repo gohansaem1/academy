@@ -698,6 +698,25 @@ export default function PaymentsPage() {
       if (studentsError) {
         console.error('환불 금액 계산 - 학생 조회 오류:', studentsError);
       } else if (inactiveStudents) {
+        // 기존 환불 상태 조회
+        const studentIds = inactiveStudents.map((s: any) => s.id);
+        const courseIds = inactiveStudents.flatMap((s: any) => 
+          s.course_enrollments?.map((e: any) => e.course_id) || []
+        );
+        
+        const { data: existingRefunds, error: refundsError } = await supabase
+          .from('refunds')
+          .select('*')
+          .in('student_id', studentIds)
+          .in('course_id', courseIds);
+        
+        const refundsMap = new Map<string, 'pending' | 'confirmed'>();
+        if (existingRefunds && !refundsError) {
+          existingRefunds.forEach((refund: any) => {
+            const key = `${refund.student_id}-${refund.course_id}-${refund.last_class_date}`;
+            refundsMap.set(key, refund.status);
+          });
+        }
         inactiveStudents.forEach((student: any) => {
           if (!student.last_class_date) return;
           
@@ -721,8 +740,11 @@ export default function PaymentsPage() {
                   totalRefundAmount += refundAmount;
                   
                   // 환불 행 데이터 추가
+                  const refundKey = `${student.id}-${enrollment.course_id}-${student.last_class_date}`;
+                  const existingStatus = refundsMap.get(refundKey) || 'pending';
+                  
                   refundRowsData.push({
-                    id: `refund-${student.id}-${enrollment.course_id}`,
+                    id: `refund-${refundKey}`,
                     student_id: student.id,
                     student_name: student.name,
                     course_id: enrollment.course_id,
@@ -730,7 +752,7 @@ export default function PaymentsPage() {
                     amount: refundAmount,
                     last_class_date: student.last_class_date,
                     payment_date: lastClassDate.toISOString().split('T')[0], // 마지막 수업일을 결제일로 사용
-                    status: 'pending', // 기본값: 미지급
+                    status: existingStatus, // DB에서 조회한 상태 또는 기본값: 미지급
                   });
                 }
               }
