@@ -626,6 +626,7 @@ export default function PaymentsPage() {
 
   // 통계 계산
   const calculateStatistics = async () => {
+    console.log('calculateStatistics called', { paymentFilter, selectedMonth, showAllPeriod });
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -739,6 +740,7 @@ export default function PaymentsPage() {
       }
       
       setRefundRows(refundRowsData);
+      console.log('환불 행 데이터 생성:', refundRowsData.length, '개', refundRowsData);
     } catch (error) {
       console.error('환불 금액 계산 오류:', error);
     }
