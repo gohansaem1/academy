@@ -51,12 +51,12 @@ export const ROLE_MENUS: Record<UserRole, Array<{ href: string; label: string }>
     { href: '/courses', label: '수업 관리' },
     { href: '/attendance/new', label: '출석 체크' },
     { href: '/payments', label: '수강료 관리' },
-    { href: '/learning-logs/new', label: '학습일지 작성' },
+    { href: '/learning-logs', label: '학습일지' },
   ],
   TEACHER: [
     { href: '/courses', label: '수업 관리' },
     { href: '/attendance/new', label: '출석 체크' },
-    { href: '/learning-logs/new', label: '학습일지 작성' },
+    { href: '/learning-logs', label: '학습일지' },
   ],
   STUDENT: [
     { href: '/courses', label: '수업 목록' },

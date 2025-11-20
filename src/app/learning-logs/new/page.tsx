@@ -135,7 +135,7 @@ function NewLearningLogContent() {
       }
 
       alert('학습일지가 작성되었습니다.');
-      router.push('/courses');
+      router.push('/learning-logs');
     } catch (error: any) {
       console.error('학습일지 작성 오류:', error);
       alert('학습일지 작성 중 오류가 발생했습니다.');

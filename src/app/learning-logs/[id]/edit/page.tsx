@@ -109,7 +109,7 @@ export default function EditLearningLogPage() {
       if (error) throw error;
 
       alert('학습일지가 수정되었습니다.');
-      router.back();
+      router.push('/learning-logs');
     } catch (error: any) {
       console.error('학습일지 수정 오류:', error);
       if (error.code === '23505') {
