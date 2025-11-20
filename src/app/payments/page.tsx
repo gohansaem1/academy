@@ -594,48 +594,61 @@ export default function PaymentsPage() {
     const totalRevenue = paymentsForStats.reduce((sum, p) => sum + p.amount, 0);
 
     // 환불 금액 계산 (그만둔 학생의 마지막 수업일이 있는 달 기준)
-    // 마지막 수업일이 선택된 달(또는 전체 기간)에 포함된 경우 환불 금액 계산
+    // 학생 데이터를 직접 조회하여 환불 금액 계산
     let totalRefundAmount = 0;
-    const refundMap = new Map<string, { refundAmount: number; lastClassDate: string; courseTuitionFee: number }>();
     
-    // 모든 결제 데이터에서 그만둔 학생의 환불 금액 계산
-    payments.forEach(payment => {
-      if (payment.student_status === 'inactive' && 
-          payment.student_last_class_date && 
-          payment.course_tuition_fee) {
-        const lastClassDate = new Date(payment.student_last_class_date);
-        const lastClassYear = lastClassDate.getFullYear();
-        const lastClassMonth = lastClassDate.getMonth() + 1;
-        
-        // 마지막 수업일이 선택된 달에 포함되는지 확인
-        let shouldInclude = false;
-        if (showAllPeriod) {
-          shouldInclude = true;
-        } else {
-          const [selectedYear, selectedMonthNum] = selectedMonth.split('-').map(Number);
-          shouldInclude = lastClassYear === selectedYear && lastClassMonth === selectedMonthNum;
-        }
-        
-        if (shouldInclude) {
-          // 학생별로 한 번만 계산 (중복 방지)
-          const key = `${payment.student_id}-${payment.course_id}-${lastClassYear}-${lastClassMonth}`;
-          if (!refundMap.has(key)) {
-            const refundAmount = calculateRefundAmount(
-              payment.course_tuition_fee,
-              lastClassDate,
-              lastClassYear,
-              lastClassMonth
-            );
-            refundMap.set(key, {
-              refundAmount,
-              lastClassDate: payment.student_last_class_date,
-              courseTuitionFee: payment.course_tuition_fee
-            });
-            totalRefundAmount += refundAmount;
+    try {
+      // 그만둔 학생 조회 (마지막 수업일이 있는 학생만)
+      const { data: inactiveStudents, error: studentsError } = await supabase
+        .from('students')
+        .select(`
+          id,
+          last_class_date,
+          course_enrollments(
+            course_id,
+            courses(tuition_fee)
+          )
+        `)
+        .eq('status', 'inactive')
+        .not('last_class_date', 'is', null);
+      
+      if (!studentsError && inactiveStudents) {
+        inactiveStudents.forEach((student: any) => {
+          if (!student.last_class_date) return;
+          
+          const lastClassDate = new Date(student.last_class_date);
+          const lastClassYear = lastClassDate.getFullYear();
+          const lastClassMonth = lastClassDate.getMonth() + 1;
+          
+          // 마지막 수업일이 선택된 달에 포함되는지 확인
+          let shouldInclude = false;
+          if (showAllPeriod) {
+            shouldInclude = true;
+          } else {
+            const [selectedYear, selectedMonthNum] = selectedMonth.split('-').map(Number);
+            shouldInclude = lastClassYear === selectedYear && lastClassMonth === selectedMonthNum;
           }
-        }
+          
+          if (shouldInclude && student.course_enrollments) {
+            // 학생이 수강하는 모든 수업에 대해 환불 금액 계산
+            student.course_enrollments.forEach((enrollment: any) => {
+              const tuitionFee = enrollment.courses?.tuition_fee;
+              if (tuitionFee) {
+                const refundAmount = calculateRefundAmount(
+                  tuitionFee,
+                  lastClassDate,
+                  lastClassYear,
+                  lastClassMonth
+                );
+                totalRefundAmount += refundAmount;
+              }
+            });
+          }
+        });
       }
-    });
+    } catch (error) {
+      console.error('환불 금액 계산 오류:', error);
+    }
 
     // 순매출액 (총 매출액 - 환불 금액)
     const netRevenue = totalRevenue - totalRefundAmount;
