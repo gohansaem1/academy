@@ -6,11 +6,24 @@ import { supabase } from '@/lib/supabase/client';
 import { Course } from '@/types/course';
 import { Instructor } from '@/types/instructor';
 import { LearningLogFormData } from '@/types/learning-log';
+import { useAuth } from '@/hooks/useAuth';
 import Button from '@/components/common/Button';
 import Input from '@/components/common/Input';
 
 export default function NewLearningLogPage() {
+  const { user, loading } = useAuth('TEACHER');
   const router = useRouter();
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
   const searchParams = useSearchParams();
   const courseIdParam = searchParams.get('courseId');
   const [loading, setLoading] = useState(false);
