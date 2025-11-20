@@ -114,18 +114,20 @@ DECLARE
   one_month_ago DATE := CURRENT_DATE - INTERVAL '1 month';
   two_months_ago DATE := CURRENT_DATE - INTERVAL '2 months';
 BEGIN
-  -- 10명의 학생에게 마지막 수업일 설정
+  -- 15명의 학생에게 마지막 수업일 설정
   FOR student_record IN 
     SELECT id, first_class_date 
     FROM students 
     ORDER BY RANDOM() 
-    LIMIT 10
+    LIMIT 15
   LOOP
-    -- 마지막 수업일: 첫 수업일 이후부터 1-2개월 전까지 랜덤
-    -- 첫 수업일보다 이전이 되지 않도록 보장
+    -- 마지막 수업일: 첫 수업일 이후부터 현재 달까지 랜덤
+    -- 일부는 현재 달에, 일부는 과거 달에 설정
     DECLARE
       min_date DATE;
       max_date DATE;
+      random_val NUMERIC;
+      current_month_start DATE := DATE_TRUNC('month', CURRENT_DATE);
     BEGIN
       -- 첫 수업일이 있으면 첫 수업일 이후, 없으면 2개월 전부터
       IF student_record.first_class_date IS NOT NULL THEN
@@ -134,14 +136,26 @@ BEGIN
         min_date := two_months_ago;
       END IF;
       
-      max_date := one_month_ago;
+      random_val := RANDOM();
+      
+      -- 30% 확률로 현재 달에 그만둔 학생 생성 (환불 금액 테스트용)
+      IF random_val < 0.3 THEN
+        -- 현재 달의 1일부터 오늘까지
+        max_date := current_date;
+        IF min_date < current_month_start THEN
+          min_date := current_month_start;
+        END IF;
+      ELSE
+        -- 나머지는 1-2개월 전
+        max_date := one_month_ago;
+      END IF;
       
       -- 마지막 수업일이 첫 수업일보다 이전이 되지 않도록
       IF min_date > max_date THEN
         min_date := max_date;
       END IF;
       
-      last_class_date_val := min_date + (RANDOM() * (max_date - min_date))::INTEGER;
+      last_class_date_val := min_date + (RANDOM() * (max_date - min_date + 1))::INTEGER;
       
       -- 마지막 수업일만 설정 (상태는 자동으로 업데이트됨)
       UPDATE students
