@@ -46,6 +46,7 @@ export default function EditStudentPage() {
         address: data.address || '',
         guardian_name: data.guardian_name,
         guardian_phone: data.guardian_phone,
+        payment_due_day: data.payment_due_day || undefined,
       });
     } catch (error) {
       console.error('학생 조회 오류:', error);
@@ -75,6 +76,9 @@ export default function EditStudentPage() {
     } else if (!/^010-\d{4}-\d{4}$/.test(formData.guardian_phone)) {
       newErrors.guardian_phone = '전화번호 형식이 올바르지 않습니다. (예: 010-1234-5678)';
     }
+    if (formData.payment_due_day !== undefined && (formData.payment_due_day < 1 || formData.payment_due_day > 31)) {
+      newErrors.payment_due_day = '결제일은 1일부터 31일 사이여야 합니다.';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -96,6 +100,7 @@ export default function EditStudentPage() {
           address: formData.address || null,
           guardian_name: formData.guardian_name,
           guardian_phone: formData.guardian_phone,
+          payment_due_day: formData.payment_due_day || null,
         })
         .eq('id', params.id);
 
@@ -173,6 +178,22 @@ export default function EditStudentPage() {
           error={errors.guardian_phone}
           required
         />
+
+        <div>
+          <label className="block text-sm font-medium mb-1 text-gray-700">
+            매월 결제일
+          </label>
+          <Input
+            type="number"
+            min="1"
+            max="31"
+            placeholder="25"
+            value={formData.payment_due_day || ''}
+            onChange={(e) => setFormData({ ...formData, payment_due_day: e.target.value ? parseInt(e.target.value) : undefined })}
+            error={errors.payment_due_day}
+          />
+          <p className="mt-1 text-sm text-gray-500">매월 결제일을 입력하세요 (1-31일)</p>
+        </div>
 
         <div className="flex gap-2 pt-4">
           <Button type="submit" disabled={saving}>

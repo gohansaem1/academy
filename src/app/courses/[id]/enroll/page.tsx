@@ -56,24 +56,70 @@ export default function EnrollStudentPage() {
 
   const handleEnroll = async (studentId: string) => {
     try {
-      const { error } = await supabase
+      // 수업 정보 조회
+      const { data: courseData, error: courseError } = await supabase
+        .from('courses')
+        .select('tuition_fee')
+        .eq('id', params.id)
+        .single();
+
+      if (courseError) throw courseError;
+
+      // 학생 정보 조회 (결제일 확인)
+      const { data: studentData, error: studentError } = await supabase
+        .from('students')
+        .select('payment_due_day')
+        .eq('id', studentId)
+        .single();
+
+      if (studentError) throw studentError;
+
+      // 수업 등록
+      const { error: enrollError } = await supabase
         .from('course_enrollments')
         .insert([{
           course_id: params.id,
           student_id: studentId,
         }]);
 
-      if (error) {
-        if (error.code === '23505') {
+      if (enrollError) {
+        if (enrollError.code === '23505') {
           alert('이미 등록된 학생입니다.');
         } else {
-          throw error;
+          throw enrollError;
         }
         return;
       }
 
+      // 결제일 계산 (학생의 payment_due_day 사용, 없으면 현재 달의 25일)
+      const today = new Date();
+      const dueDay = studentData.payment_due_day || 25;
+      const paymentDate = new Date(today.getFullYear(), today.getMonth(), dueDay);
+      
+      // 결제일이 이미 지났으면 다음 달로 설정
+      if (paymentDate < today) {
+        paymentDate.setMonth(paymentDate.getMonth() + 1);
+      }
+
+      // 결제 항목 자동 생성
+      const { error: paymentError } = await supabase
+        .from('payments')
+        .insert([{
+          student_id: studentId,
+          course_id: params.id as string,
+          amount: courseData.tuition_fee,
+          payment_method: 'transfer', // 기본값: 계좌이체
+          payment_date: paymentDate.toISOString().split('T')[0],
+          status: 'pending', // 기본값: 대기
+        }]);
+
+      if (paymentError) {
+        console.error('결제 항목 생성 오류:', paymentError);
+        // 결제 항목 생성 실패해도 수업 등록은 성공한 것으로 처리
+      }
+
       setEnrolledStudents([...enrolledStudents, studentId]);
-      alert('학생이 등록되었습니다.');
+      alert('학생이 등록되었습니다. 결제 항목이 자동으로 생성되었습니다.');
     } catch (error: any) {
       console.error('학생 등록 오류:', error);
       alert('학생 등록 중 오류가 발생했습니다.');

@@ -245,9 +245,6 @@ export default function PaymentsPage() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">수강료 관리</h1>
-        <Link href="/payments/new">
-          <Button>결제 등록</Button>
-        </Link>
       </div>
 
       <div className="mb-4 space-y-4">
