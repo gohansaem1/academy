@@ -31,7 +31,7 @@ export default function NewPaymentPage() {
     );
   }
 
-  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [courses, setCourses] = useState<Course[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [formData, setFormData] = useState<PaymentFormData>({
@@ -112,7 +112,7 @@ export default function NewPaymentPage() {
     if (!validate()) return;
 
     try {
-      setLoading(true);
+      setSaving(true);
       const { error } = await supabase
         .from('payments')
         .insert([{
@@ -132,7 +132,7 @@ export default function NewPaymentPage() {
       console.error('결제 등록 오류:', error);
       alert('결제 등록 중 오류가 발생했습니다.');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
@@ -223,8 +223,8 @@ export default function NewPaymentPage() {
         />
 
         <div className="flex gap-2 pt-4">
-          <Button type="submit" disabled={loading}>
-            {loading ? '등록 중...' : '등록'}
+          <Button type="submit" disabled={saving}>
+            {saving ? '등록 중...' : '등록'}
           </Button>
           <Button
             type="button"
