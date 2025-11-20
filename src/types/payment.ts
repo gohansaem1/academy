@@ -17,6 +17,6 @@ export interface PaymentFormData {
   amount: number;
   payment_method: 'cash' | 'card' | 'transfer';
   payment_date: string;
-  status?: 'completed' | 'pending' | 'cancelled';
+  status?: 'completed' | 'pending' | 'confirmed' | 'cancelled';
 }
 

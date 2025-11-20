@@ -171,15 +171,33 @@ export default function PaymentsPage() {
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
-                    {payment.status === 'completed' && (
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleCancel(payment.id)}
-                      >
-                        취소
-                      </Button>
-                    )}
+                    <div className="flex justify-end gap-2">
+                      {payment.status === 'pending' && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleConfirm(payment.id)}
+                        >
+                          확인
+                        </Button>
+                      )}
+                      {payment.status === 'completed' && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleConfirm(payment.id)}
+                        >
+                          확인
+                        </Button>
+                      )}
+                      {(payment.status === 'pending' || payment.status === 'completed') && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleCancel(payment.id)}
+                        >
+                          취소
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
