@@ -12,6 +12,7 @@ export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState<'active' | 'inactive'>('active');
 
   useEffect(() => {
     fetchStudents();
@@ -53,10 +54,14 @@ export default function StudentsPage() {
     }
   };
 
-  const filteredStudents = students.filter(student =>
-    student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    student.phone.includes(searchTerm)
-  );
+  const filteredStudents = students.filter(student => {
+    const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.phone.includes(searchTerm);
+    const matchesStatus = activeTab === 'active' 
+      ? (student.status === 'active' || !student.status) // 기본값은 active
+      : student.status === 'inactive';
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <div>
@@ -65,6 +70,32 @@ export default function StudentsPage() {
         <Link href="/students/new">
           <Button>학생 등록</Button>
         </Link>
+      </div>
+
+      {/* 탭 메뉴 */}
+      <div className="mb-4 border-b border-gray-200">
+        <nav className="flex space-x-8">
+          <button
+            onClick={() => setActiveTab('active')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'active'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            재학생 ({students.filter(s => s.status === 'active' || !s.status).length})
+          </button>
+          <button
+            onClick={() => setActiveTab('inactive')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'inactive'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            그만둔 학생 ({students.filter(s => s.status === 'inactive').length})
+          </button>
+        </nav>
       </div>
 
       <div className="mb-4">
@@ -92,6 +123,7 @@ export default function StudentsPage() {
                 <TableHead>이메일</TableHead>
                 <TableHead>보호자 이름</TableHead>
                 <TableHead>보호자 전화번호</TableHead>
+                <TableHead>상태</TableHead>
                 <TableHead>등록일</TableHead>
                 <TableHead className="text-right">작업</TableHead>
               </TableRow>
@@ -104,6 +136,15 @@ export default function StudentsPage() {
                   <TableCell>{student.email || '-'}</TableCell>
                   <TableCell>{student.guardian_name}</TableCell>
                   <TableCell>{student.guardian_phone}</TableCell>
+                  <TableCell>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      student.status === 'inactive' 
+                        ? 'bg-gray-100 text-gray-800' 
+                        : 'bg-green-100 text-green-800'
+                    }`}>
+                      {student.status === 'inactive' ? '그만둠' : '재학'}
+                    </span>
+                  </TableCell>
                   <TableCell>
                     {new Date(student.created_at).toLocaleDateString('ko-KR')}
                   </TableCell>

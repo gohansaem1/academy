@@ -86,7 +86,7 @@ export default function NewAttendancePage() {
     }
   };
 
-  // 수업에 등록된 학생 조회
+  // 수업에 등록된 학생 조회 (재학생만)
   const fetchEnrolledStudents = async (courseId: string) => {
     try {
       const { data, error } = await supabase
@@ -99,7 +99,10 @@ export default function NewAttendancePage() {
         .order('students(name)', { ascending: true });
 
       if (error) throw error;
-      const enrolledStudents = (data || []).map((item: any) => item.students).filter(Boolean);
+      // 재학생만 필터링
+      const enrolledStudents = (data || [])
+        .map((item: any) => item.students)
+        .filter((student: any) => student && (student.status === 'active' || !student.status));
       setStudents(enrolledStudents);
     } catch (error) {
       console.error('등록 학생 조회 오류:', error);

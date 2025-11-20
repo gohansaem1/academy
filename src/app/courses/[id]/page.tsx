@@ -62,17 +62,23 @@ export default function CourseDetailPage() {
         .from('course_enrollments')
         .select(`
           *,
-          students(name)
+          students(name, status)
         `)
         .eq('course_id', courseId)
         .order('enrolled_at', { ascending: false });
 
       if (error) throw error;
 
-      const enrollmentsWithNames = (data || []).map((enrollment: any) => ({
-        ...enrollment,
-        student_name: enrollment.students?.name,
-      }));
+      // 재학생만 필터링
+      const enrollmentsWithNames = (data || [])
+        .filter((enrollment: any) => 
+          enrollment.students && 
+          (enrollment.students.status === 'active' || !enrollment.students.status)
+        )
+        .map((enrollment: any) => ({
+          ...enrollment,
+          student_name: enrollment.students?.name,
+        }));
 
       setEnrollments(enrollmentsWithNames);
     } catch (error) {
@@ -93,12 +99,13 @@ export default function CourseDetailPage() {
 
       if (error) throw error;
 
-      // 학생 정보도 함께 가져오기 (코멘트 표시용)
+      // 학생 정보도 함께 가져오기 (코멘트 표시용, 재학생만)
       const studentIds = enrollments.map(e => e.student_id);
       const { data: studentsData } = await supabase
         .from('students')
-        .select('id, name')
-        .in('id', studentIds);
+        .select('id, name, status')
+        .in('id', studentIds)
+        .or('status.is.null,status.eq.active');
 
       const studentsMap = new Map((studentsData || []).map((s: any) => [s.id, s.name]));
 

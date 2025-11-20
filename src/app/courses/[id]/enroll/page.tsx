@@ -28,6 +28,7 @@ export default function EnrollStudentPage() {
       const { data, error } = await supabase
         .from('students')
         .select('*')
+        .or('status.is.null,status.eq.active') // 재학생만 조회
         .order('name');
 
       if (error) throw error;

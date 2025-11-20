@@ -20,6 +20,7 @@ export default function NewStudentPage() {
     guardian_name: '',
     guardian_phone: '',
     payment_due_day: 25, // 기본값: 25일
+    status: 'active', // 기본값: 재학
   });
   const [errors, setErrors] = useState<Partial<Record<keyof StudentFormData, string>>>({});
 
@@ -78,6 +79,7 @@ export default function NewStudentPage() {
           guardian_name: formData.guardian_name,
           guardian_phone: formData.guardian_phone,
           payment_due_day: formData.payment_due_day || null,
+          status: formData.status || 'active',
         }]);
 
       if (error) throw error;
@@ -165,6 +167,21 @@ export default function NewStudentPage() {
             error={errors.payment_due_day}
           />
           <p className="mt-1 text-sm text-gray-500">매월 결제일을 입력하세요 (1-31일)</p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1 text-gray-700">
+            학생 상태
+          </label>
+          <select
+            value={formData.status || 'active'}
+            onChange={(e) => setFormData({ ...formData, status: e.target.value as 'active' | 'inactive' })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="active">재학</option>
+            <option value="inactive">그만둔</option>
+          </select>
+          <p className="mt-1 text-sm text-gray-500">학생의 현재 상태를 선택하세요</p>
         </div>
 
         <div className="flex gap-2 pt-4">

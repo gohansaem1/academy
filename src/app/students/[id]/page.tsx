@@ -295,6 +295,45 @@ function StudentDetailContent() {
       {/* 기본 정보 탭 */}
       {activeTab === 'info' && (
         <div className="bg-white border rounded-lg p-6 space-y-4">
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <label className="text-sm font-medium text-gray-500">상태</label>
+            <div className="mt-1">
+              <span className={`px-3 py-1 rounded text-sm font-medium ${
+                student.status === 'inactive' 
+                  ? 'bg-gray-100 text-gray-800' 
+                  : 'bg-green-100 text-green-800'
+              }`}>
+                {student.status === 'inactive' ? '그만둔 학생' : '재학생'}
+              </span>
+            </div>
+          </div>
+          {user?.role === 'ADMIN' && (
+            <Button
+              variant={student.status === 'inactive' ? 'default' : 'outline'}
+              onClick={async () => {
+                const newStatus = student.status === 'inactive' ? 'active' : 'inactive';
+                if (!confirm(`정말 ${newStatus === 'active' ? '재학' : '그만둔'} 상태로 변경하시겠습니까?`)) return;
+                
+                try {
+                  const { error } = await supabase
+                    .from('students')
+                    .update({ status: newStatus })
+                    .eq('id', params.id);
+                  
+                  if (error) throw error;
+                  fetchStudent(params.id as string);
+                  alert(`학생 상태가 ${newStatus === 'active' ? '재학' : '그만둔'}으로 변경되었습니다.`);
+                } catch (error) {
+                  console.error('상태 변경 오류:', error);
+                  alert('상태 변경 중 오류가 발생했습니다.');
+                }
+              }}
+            >
+              {student.status === 'inactive' ? '재학으로 변경' : '그만둔으로 변경'}
+            </Button>
+          )}
+        </div>
         <div>
           <label className="text-sm font-medium text-gray-500">이름</label>
           <p className="text-lg font-semibold mt-1">{student.name}</p>
