@@ -279,6 +279,64 @@ export default function CourseDetailPage() {
         )}
       </div>
 
+      <div className="mt-8">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-semibold">학습일지 ({learningLogs.length}개)</h2>
+          <Link href={`/learning-logs/new?courseId=${params.id}`}>
+            <Button size="sm">학습일지 작성</Button>
+          </Link>
+        </div>
+        {learningLogs.length === 0 ? (
+          <div className="text-center py-8 text-gray-500 border rounded-lg">
+            등록된 학습일지가 없습니다.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {learningLogs.map((log) => (
+              <div key={log.id} className="bg-white border rounded-lg p-4">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <p className="text-sm text-gray-500">
+                      {new Date(log.date).toLocaleDateString('ko-KR')} | 작성자: {log.instructor_name || '-'}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Link href={`/learning-logs/${log.id}/edit`}>
+                      <Button variant="outline" size="sm">수정</Button>
+                    </Link>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDeleteLog(log.id)}
+                    >
+                      삭제
+                    </Button>
+                  </div>
+                </div>
+                <div className="mt-3 space-y-2">
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">학습 내용</label>
+                    <p className="text-sm mt-1 whitespace-pre-wrap">{log.content}</p>
+                  </div>
+                  {log.homework && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">숙제</label>
+                      <p className="text-sm mt-1 whitespace-pre-wrap">{log.homework}</p>
+                    </div>
+                  )}
+                  {log.notes && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">특이사항</label>
+                      <p className="text-sm mt-1 whitespace-pre-wrap">{log.notes}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="mt-6">
         <Link href="/courses">
           <Button variant="outline">목록으로</Button>

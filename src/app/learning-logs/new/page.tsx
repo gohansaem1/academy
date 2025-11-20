@@ -11,11 +11,13 @@ import Input from '@/components/common/Input';
 
 export default function NewLearningLogPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const courseIdParam = searchParams.get('courseId');
   const [loading, setLoading] = useState(false);
   const [courses, setCourses] = useState<Course[]>([]);
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [formData, setFormData] = useState<LearningLogFormData>({
-    course_id: '',
+    course_id: courseIdParam || '',
     date: new Date().toISOString().split('T')[0],
     content: '',
     homework: '',
