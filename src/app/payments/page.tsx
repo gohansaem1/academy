@@ -44,7 +44,7 @@ interface PaymentWithStudent extends Payment {
   course_tuition_fee?: number | null;
 }
 
-type PaymentFilter = 'all' | 'overdue' | 'confirmed';
+type PaymentFilter = 'all' | 'overdue' | 'confirmed' | 'first_month' | 'refund';
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<PaymentWithStudent[]>([]);
@@ -527,6 +527,22 @@ export default function PaymentsPage() {
         case 'confirmed':
           // 입금확인: confirmed 또는 completed 상태
           return payment.status === 'confirmed' || payment.status === 'completed';
+        case 'first_month':
+          // 첫 달 금액: 첫 수업일이 결제일과 같은 달에 있는 경우
+          if (!payment.student_first_class_date) return false;
+          const firstClassDate = new Date(payment.student_first_class_date);
+          const paymentDateForFirst = new Date(payment.payment_date);
+          return firstClassDate.getFullYear() === paymentDateForFirst.getFullYear() &&
+                 firstClassDate.getMonth() === paymentDateForFirst.getMonth() &&
+                 payment.status !== 'cancelled';
+        case 'refund':
+          // 환불 금액: 학생이 그만둔 상태이고 마지막 수업일이 결제일과 같은 달에 있는 경우
+          if (payment.student_status !== 'inactive' || !payment.student_last_class_date) return false;
+          const lastClassDate = new Date(payment.student_last_class_date);
+          const paymentDateForRefund = new Date(payment.payment_date);
+          return lastClassDate.getFullYear() === paymentDateForRefund.getFullYear() &&
+                 lastClassDate.getMonth() === paymentDateForRefund.getMonth() &&
+                 payment.status !== 'cancelled';
         case 'all':
         default:
           // 전체: 취소 제외
