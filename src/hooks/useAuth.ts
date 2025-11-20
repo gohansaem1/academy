@@ -37,8 +37,8 @@ export function useAuth(requiredRole?: 'ADMIN' | 'TEACHER' | 'STUDENT' | 'PARENT
         return;
       }
 
-      // 역할 기반 접근 제어
-      if (requiredRole && currentUser.role !== requiredRole) {
+      // 역할 기반 접근 제어 (관리자는 모든 페이지 접근 가능)
+      if (requiredRole && currentUser.role !== requiredRole && currentUser.role !== 'ADMIN') {
         alert('접근 권한이 없습니다.');
         router.push('/');
         return;

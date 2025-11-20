@@ -81,6 +81,11 @@ export function canAccessRoute(user: User | null, pathname: string): boolean {
     return pathname === '/auth/login' || pathname === '/auth/register' || pathname === '/';
   }
 
+  // 관리자는 모든 경로에 접근 가능 (인증 페이지 제외)
+  if (user.role === 'ADMIN') {
+    return !pathname.startsWith('/auth/');
+  }
+
   const allowedRoutes = ROLE_ROUTES[user.role];
   return allowedRoutes.some(route => {
     // 정확한 경로 매칭 또는 하위 경로 매칭
