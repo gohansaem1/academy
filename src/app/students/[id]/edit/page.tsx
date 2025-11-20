@@ -12,6 +12,8 @@ export default function EditStudentPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [currentStudent, setCurrentStudent] = useState<any>(null);
+  const [lastClassDate, setLastClassDate] = useState<string>('');
   const [formData, setFormData] = useState<StudentFormData>({
     name: '',
     phone: '',
@@ -40,6 +42,7 @@ export default function EditStudentPage() {
       if (error) throw error;
 
       setCurrentStudent(data);
+      setLastClassDate(data.last_class_date || '');
       setFormData({
         name: data.name,
         phone: data.phone,
@@ -223,25 +226,37 @@ export default function EditStudentPage() {
           </label>
           <Input
             type="date"
-            value={currentStudent?.last_class_date || ''}
-            onChange={async (e) => {
-              const lastClassDate = e.target.value || null;
-              // 마지막 수업일 업데이트 (상태는 자동으로 업데이트됨)
-              await supabase
-                .from('students')
-                .update({ last_class_date: lastClassDate })
-                .eq('id', params.id);
-              
-              // 자동 상태 업데이트 확인
-              const { autoUpdateStudentStatusIfNeeded } = await import('@/lib/utils/student-status');
-              await autoUpdateStudentStatusIfNeeded(
-                params.id as string,
-                'active',
-                lastClassDate
-              );
-              
-              // 폼 데이터 새로고침
-              fetchStudent(params.id as string);
+            value={lastClassDate}
+            onChange={(e) => {
+              setLastClassDate(e.target.value);
+            }}
+            onBlur={async () => {
+              const lastClassDateValue = lastClassDate || null;
+              try {
+                // 마지막 수업일 업데이트 (상태는 자동으로 업데이트됨)
+                const { error: updateError } = await supabase
+                  .from('students')
+                  .update({ last_class_date: lastClassDateValue })
+                  .eq('id', params.id);
+                
+                if (updateError) throw updateError;
+                
+                // 자동 상태 업데이트 확인
+                const { autoUpdateStudentStatusIfNeeded } = await import('@/lib/utils/student-status');
+                await autoUpdateStudentStatusIfNeeded(
+                  params.id as string,
+                  currentStudent?.status || 'active',
+                  lastClassDateValue
+                );
+                
+                // 폼 데이터 새로고침
+                fetchStudent(params.id as string);
+              } catch (error) {
+                console.error('마지막 수업일 업데이트 오류:', error);
+                alert('마지막 수업일 업데이트 중 오류가 발생했습니다.');
+                // 원래 값으로 복원
+                setLastClassDate(currentStudent?.last_class_date || '');
+              }
             }}
           />
           <p className="mt-1 text-sm text-gray-500">마지막 수업일을 입력하세요. 현재 날짜보다 이전이면 자동으로 그만둔 상태로 변경됩니다.</p>
