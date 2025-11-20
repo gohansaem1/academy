@@ -597,7 +597,7 @@ export default function PaymentsPage() {
       </div>
 
       {/* 통계 카드 */}
-      <div className={`grid grid-cols-1 md:grid-cols-${expectedRevenue !== null ? '5' : '4'} gap-4 mb-6`}>
+      <div className={`grid grid-cols-1 md:grid-cols-4 ${expectedRevenue !== null ? 'lg:grid-cols-5' : ''} gap-4 mb-6`}>
         <div className="bg-white border rounded-lg p-4">
           <div className="text-sm text-gray-500 mb-1">해당 달 매출액</div>
           <div className="text-2xl font-bold text-gray-900">
