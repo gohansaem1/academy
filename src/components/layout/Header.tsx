@@ -54,12 +54,6 @@ export default function Header() {
                 </Link>
               ))}
               <div className="flex items-center gap-4 ml-auto">
-                <Link
-                  href="/profile/change-password"
-                  className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
-                >
-                  비밀번호 변경
-                </Link>
                 <span className="text-sm text-gray-600">
                   {user.name} ({getRoleLabel(user.role)})
                 </span>
