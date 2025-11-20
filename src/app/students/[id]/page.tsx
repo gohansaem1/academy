@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase/client';
 import { Student } from '@/types/student';
 import { LearningLog } from '@/types/learning-log';
 import { Attendance } from '@/types/attendance';
+import { useAuth } from '@/hooks/useAuth';
 import Button from '@/components/common/Button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/common/Table';
 import Input from '@/components/common/Input';
@@ -30,6 +31,7 @@ function StudentDetailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const activeTab = searchParams.get('tab') || 'info';
+  const { user } = useAuth();
   
   const [student, setStudent] = useState<Student | null>(null);
   const [learningLogs, setLearningLogs] = useState<LearningLog[]>([]);
@@ -104,11 +106,27 @@ function StudentDetailContent() {
 
       if (error) throw error;
 
-      const logsWithNames = (data || []).map((log: any) => ({
-        ...log,
-        course_name: log.courses?.name,
-        instructor_name: log.instructors?.name,
-      }));
+      // 학생 정보 가져오기 (코멘트 표시용)
+      const studentId = params.id as string;
+      
+      const logsWithNames = (data || []).map((log: any) => {
+        // 학생이 자신의 학습일지를 볼 때는 자신의 코멘트만 표시
+        let filteredComments = log.student_comments || {};
+        if (user?.role === 'STUDENT' && params.id) {
+          // 현재 로그인한 학생의 코멘트만 필터링
+          filteredComments = log.student_comments?.[studentId] 
+            ? { [studentId]: log.student_comments[studentId] }
+            : {};
+        }
+
+        return {
+          ...log,
+          course_name: log.courses?.name,
+          instructor_name: log.instructors?.name,
+          student_comments: filteredComments,
+          currentStudentId: studentId, // 현재 학생 ID 저장
+        };
+      });
 
       setLearningLogs(logsWithNames);
     } catch (error) {
@@ -520,6 +538,29 @@ function StudentDetailContent() {
                       <div>
                         <label className="text-sm font-medium text-gray-500">특이사항</label>
                         <p className="text-sm mt-1 whitespace-pre-wrap">{log.notes}</p>
+                      </div>
+                    )}
+                    {log.student_comments && Object.keys(log.student_comments).length > 0 && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">개별 코멘트</label>
+                        <div className="mt-2 space-y-2">
+                          {Object.entries(log.student_comments).map(([studentId, comment]) => {
+                            // 학생이 볼 때는 자신의 코멘트만 표시
+                            if (user?.role === 'STUDENT' && studentId !== params.id) {
+                              return null;
+                            }
+                            // 관리자/강사가 볼 때는 학생 이름도 함께 표시
+                            const studentName = student?.id === studentId ? student.name : '학생';
+                            return (
+                              <div key={studentId} className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                {user?.role !== 'STUDENT' && (
+                                  <div className="text-xs font-medium text-blue-700 mb-1">{studentName}</div>
+                                )}
+                                <p className="text-sm whitespace-pre-wrap">{comment as string}</p>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
                   </div>

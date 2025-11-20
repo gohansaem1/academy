@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { LearningLogFormData } from '@/types/learning-log';
 import { Course } from '@/types/course';
+import { Student } from '@/types/student';
 import Button from '@/components/common/Button';
 import Input from '@/components/common/Input';
 
@@ -14,12 +15,14 @@ export default function EditLearningLogPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [courses, setCourses] = useState<Course[]>([]);
+  const [enrolledStudents, setEnrolledStudents] = useState<Student[]>([]);
   const [formData, setFormData] = useState<LearningLogFormData>({
     course_id: '',
     date: '',
     content: '',
     homework: '',
     notes: '',
+    student_comments: {},
   });
   const [errors, setErrors] = useState<Partial<Record<keyof LearningLogFormData, string>>>({});
 
@@ -29,6 +32,12 @@ export default function EditLearningLogPage() {
       fetchLearningLog(params.id as string);
     }
   }, [params.id]);
+
+  useEffect(() => {
+    if (formData.course_id) {
+      fetchEnrolledStudents(formData.course_id);
+    }
+  }, [formData.course_id]);
 
   const fetchCourses = async () => {
     try {
@@ -61,6 +70,7 @@ export default function EditLearningLogPage() {
         content: data.content,
         homework: data.homework || '',
         notes: data.notes || '',
+        student_comments: data.student_comments || {},
       });
     } catch (error) {
       console.error('학습일지 조회 오류:', error);
@@ -68,6 +78,36 @@ export default function EditLearningLogPage() {
       router.back();
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchEnrolledStudents = async (courseId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('course_enrollments')
+        .select(`
+          student_id,
+          students(*)
+        `)
+        .eq('course_id', courseId);
+
+      if (error) throw error;
+
+      const students = (data || []).map((enrollment: any) => enrollment.students).filter(Boolean);
+      setEnrolledStudents(students);
+
+      // 기존 코멘트와 함께 학생 목록 업데이트
+      const currentComments = formData.student_comments || {};
+      const updatedComments: Record<string, string> = {};
+      students.forEach((student: Student) => {
+        updatedComments[student.id] = currentComments[student.id] || '';
+      });
+      setFormData(prev => ({
+        ...prev,
+        student_comments: updatedComments,
+      }));
+    } catch (error) {
+      console.error('등록 학생 조회 오류:', error);
     }
   };
 
@@ -95,6 +135,11 @@ export default function EditLearningLogPage() {
 
     try {
       setSaving(true);
+      // 빈 코멘트 제거
+      const studentComments = Object.fromEntries(
+        Object.entries(formData.student_comments || {}).filter(([_, comment]) => comment.trim())
+      );
+
       const { error } = await supabase
         .from('learning_logs')
         .update({
@@ -103,6 +148,7 @@ export default function EditLearningLogPage() {
           content: formData.content,
           homework: formData.homework || null,
           notes: formData.notes || null,
+          student_comments: Object.keys(studentComments).length > 0 ? studentComments : null,
         })
         .eq('id', params.id);
 
@@ -202,6 +248,37 @@ export default function EditLearningLogPage() {
             placeholder="특이사항이나 메모를 작성해주세요."
           />
         </div>
+
+        {enrolledStudents.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium mb-2 text-gray-700">
+              학생별 개별 코멘트
+            </label>
+            <div className="space-y-3 border rounded-lg p-4 bg-gray-50">
+              {enrolledStudents.map((student) => (
+                <div key={student.id}>
+                  <label className="block text-sm font-medium mb-1 text-gray-600">
+                    {student.name}
+                  </label>
+                  <textarea
+                    value={formData.student_comments?.[student.id] || ''}
+                    onChange={(e) => {
+                      setFormData({
+                        ...formData,
+                        student_comments: {
+                          ...formData.student_comments,
+                          [student.id]: e.target.value,
+                        },
+                      });
+                    }}
+                    className="flex min-h-[60px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder={`${student.name} 학생에 대한 개별 코멘트를 작성해주세요.`}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-2 pt-4">
           <Button type="submit" disabled={saving}>

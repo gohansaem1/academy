@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase/client';
 import { Course, CourseEnrollment } from '@/types/course';
 import { LearningLog } from '@/types/learning-log';
+import { useAuth } from '@/hooks/useAuth';
 import Button from '@/components/common/Button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/common/Table';
 
@@ -14,6 +15,7 @@ const DAYS_OF_WEEK = ['일요일', '월요일', '화요일', '수요일', '목�
 export default function CourseDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { user } = useAuth();
   const [course, setCourse] = useState<Course | null>(null);
   const [enrollments, setEnrollments] = useState<CourseEnrollment[]>([]);
   const [learningLogs, setLearningLogs] = useState<LearningLog[]>([]);
@@ -91,10 +93,38 @@ export default function CourseDetailPage() {
 
       if (error) throw error;
 
-      const logsWithNames = (data || []).map((log: any) => ({
-        ...log,
-        instructor_name: log.instructors?.name,
-      }));
+      // 학생 정보도 함께 가져오기 (코멘트 표시용)
+      const studentIds = enrollments.map(e => e.student_id);
+      const { data: studentsData } = await supabase
+        .from('students')
+        .select('id, name')
+        .in('id', studentIds);
+
+      const studentsMap = new Map((studentsData || []).map((s: any) => [s.id, s.name]));
+
+      const logsWithNames = (data || []).map((log: any) => {
+        // 학생이 자신의 학습일지를 볼 때는 자신의 코멘트만 표시
+        let filteredComments = log.student_comments || {};
+        if (user?.role === 'STUDENT') {
+          // 학생이 수강하는 수업인지 확인
+          const isEnrolled = enrollments.some(e => e.student_id === user.id);
+          if (isEnrolled && log.student_comments) {
+            // 현재 로그인한 학생의 코멘트만 필터링
+            filteredComments = log.student_comments[user.id] 
+              ? { [user.id]: log.student_comments[user.id] }
+              : {};
+          } else {
+            filteredComments = {};
+          }
+        }
+
+        return {
+          ...log,
+          instructor_name: log.instructors?.name,
+          student_comments: filteredComments,
+          studentsMap, // 학생 이름 매핑
+        };
+      });
 
       setLearningLogs(logsWithNames);
     } catch (error) {
@@ -333,6 +363,29 @@ export default function CourseDetailPage() {
                     <div>
                       <label className="text-sm font-medium text-gray-500">특이사항</label>
                       <p className="text-sm mt-1 whitespace-pre-wrap">{log.notes}</p>
+                    </div>
+                  )}
+                  {log.student_comments && Object.keys(log.student_comments).length > 0 && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">개별 코멘트</label>
+                      <div className="mt-2 space-y-2">
+                        {Object.entries(log.student_comments).map(([studentId, comment]) => {
+                          // 학생이 볼 때는 자신의 코멘트만 표시
+                          if (user?.role === 'STUDENT' && studentId !== user.id) {
+                            return null;
+                          }
+                          // 관리자/강사가 볼 때는 학생 이름도 함께 표시
+                          const studentName = (log as any).studentsMap?.get(studentId) || '학생';
+                          return (
+                            <div key={studentId} className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                              {user?.role !== 'STUDENT' && (
+                                <div className="text-xs font-medium text-blue-700 mb-1">{studentName}</div>
+                              )}
+                              <p className="text-sm whitespace-pre-wrap">{comment as string}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>

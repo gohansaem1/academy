@@ -6,6 +6,7 @@ export interface LearningLog {
   homework?: string | null;
   notes?: string | null;
   instructor_id: string;
+  student_comments?: Record<string, string> | null; // 학생 ID를 키로 하는 코멘트 객체
   created_at: string;
   updated_at: string;
   course_name?: string;
@@ -18,5 +19,6 @@ export interface LearningLogFormData {
   content: string;
   homework?: string;
   notes?: string;
+  student_comments?: Record<string, string>; // 학생 ID를 키로 하는 코멘트 객체
 }
 
