@@ -682,8 +682,9 @@ export default function PaymentsPage() {
         .eq('status', 'inactive')
         .not('last_class_date', 'is', null);
       
-      // 전체 기간이 아닐 때는 마지막 수업일이 선택된 달에 있는 학생만 조회
-      if (!showAllPeriod && selectedYear && selectedMonthNum) {
+      // 환불 금액 필터 선택 시 또는 전체 기간이 아닐 때는 마지막 수업일이 선택된 달에 있는 학생만 조회
+      // 환불 금액 필터 선택 시에는 선택된 달의 환불만 표시
+      if ((paymentFilter === 'refund' || !showAllPeriod) && selectedYear && selectedMonthNum) {
         const monthStart = new Date(selectedYear, selectedMonthNum - 1, 1);
         const monthEnd = new Date(selectedYear, selectedMonthNum, 0);
         query = query
@@ -795,10 +796,10 @@ export default function PaymentsPage() {
 
   // 통계 계산 useEffect
   useEffect(() => {
-    if (payments.length > 0 || showAllPeriod) {
+    if (payments.length > 0 || showAllPeriod || paymentFilter === 'refund') {
       calculateStatistics().then(setStatistics).catch(console.error);
     }
-  }, [payments, selectedMonth, showAllPeriod]);
+  }, [payments, selectedMonth, showAllPeriod, paymentFilter]);
 
   return (
     <div>
