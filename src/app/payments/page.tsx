@@ -593,27 +593,46 @@ export default function PaymentsPage() {
     // 매출액 (모든 결제 금액 합계, 취소 제외)
     const totalRevenue = paymentsForStats.reduce((sum, p) => sum + p.amount, 0);
 
-    // 환불 금액 계산 (그만둔 학생의 마지막 달 환불)
+    // 환불 금액 계산 (그만둔 학생의 마지막 수업일이 있는 달 기준)
+    // 마지막 수업일이 선택된 달(또는 전체 기간)에 포함된 경우 환불 금액 계산
     let totalRefundAmount = 0;
-    paymentsForStats.forEach(payment => {
+    const refundMap = new Map<string, { refundAmount: number; lastClassDate: string; courseTuitionFee: number }>();
+    
+    // 모든 결제 데이터에서 그만둔 학생의 환불 금액 계산
+    payments.forEach(payment => {
       if (payment.student_status === 'inactive' && 
           payment.student_last_class_date && 
           payment.course_tuition_fee) {
-        const paymentDate = new Date(payment.payment_date);
         const lastClassDate = new Date(payment.student_last_class_date);
-        const paymentYear = paymentDate.getFullYear();
-        const paymentMonth = paymentDate.getMonth() + 1;
+        const lastClassYear = lastClassDate.getFullYear();
+        const lastClassMonth = lastClassDate.getMonth() + 1;
         
-        // 마지막 수업일이 결제일과 같은 달인 경우 환불 금액 계산
-        if (lastClassDate.getFullYear() === paymentYear && 
-            lastClassDate.getMonth() === paymentDate.getMonth()) {
-          const refundAmount = calculateRefundAmount(
-            payment.course_tuition_fee,
-            lastClassDate,
-            paymentYear,
-            paymentMonth
-          );
-          totalRefundAmount += refundAmount;
+        // 마지막 수업일이 선택된 달에 포함되는지 확인
+        let shouldInclude = false;
+        if (showAllPeriod) {
+          shouldInclude = true;
+        } else {
+          const [selectedYear, selectedMonth] = selectedMonth.split('-').map(Number);
+          shouldInclude = lastClassYear === selectedYear && lastClassMonth === selectedMonth;
+        }
+        
+        if (shouldInclude) {
+          // 학생별로 한 번만 계산 (중복 방지)
+          const key = `${payment.student_id}-${payment.course_id}-${lastClassYear}-${lastClassMonth}`;
+          if (!refundMap.has(key)) {
+            const refundAmount = calculateRefundAmount(
+              payment.course_tuition_fee,
+              lastClassDate,
+              lastClassYear,
+              lastClassMonth
+            );
+            refundMap.set(key, {
+              refundAmount,
+              lastClassDate: payment.student_last_class_date,
+              courseTuitionFee: payment.course_tuition_fee
+            });
+            totalRefundAmount += refundAmount;
+          }
         }
       }
     });
@@ -621,33 +640,11 @@ export default function PaymentsPage() {
     // 순매출액 (총 매출액 - 환불 금액)
     const netRevenue = totalRevenue - totalRefundAmount;
 
-    // 결제액 (완료/확인된 결제 금액 합계, 환불 금액 차감)
+    // 결제액 (완료/확인된 결제 금액 합계)
+    // 환불 금액은 별도로 계산되므로 결제액에서는 차감하지 않음
     const paidAmount = paymentsForStats
       .filter(p => p.status === 'completed' || p.status === 'confirmed')
-      .reduce((sum, p) => {
-        let amount = p.amount;
-        // 환불이 필요한 경우 환불 금액 차감
-        if (p.student_status === 'inactive' && 
-            p.student_last_class_date && 
-            p.course_tuition_fee) {
-          const paymentDate = new Date(p.payment_date);
-          const lastClassDate = new Date(p.student_last_class_date);
-          const paymentYear = paymentDate.getFullYear();
-          const paymentMonth = paymentDate.getMonth() + 1;
-          
-          if (lastClassDate.getFullYear() === paymentYear && 
-              lastClassDate.getMonth() === paymentDate.getMonth()) {
-            const refundAmount = calculateRefundAmount(
-              p.course_tuition_fee,
-              lastClassDate,
-              paymentYear,
-              paymentMonth
-            );
-            amount -= refundAmount;
-          }
-        }
-        return sum + amount;
-      }, 0);
+      .reduce((sum, p) => sum + p.amount, 0);
 
     // 미납액 (결제일이 지났지만 아직 완료되지 않은 결제, 또는 상태가 pending인 결제)
     const overdueAmount = paymentsForStats
