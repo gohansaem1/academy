@@ -90,8 +90,8 @@ export function calculateAttendedClassDays(
 
 /**
  * 첫 수업일 기준으로 해당 달 남은 수업 금액을 계산합니다.
+ * 해당 월의 일수 기준으로 계산합니다.
  * @param monthlyTuition 월 수강료
- * @param schedule 수업 스케줄 배열
  * @param firstClassDate 첫 수업일
  * @param year 연도
  * @param month 월 (1-12)
@@ -99,22 +99,37 @@ export function calculateAttendedClassDays(
  */
 export function calculateProportionalTuition(
   monthlyTuition: number,
-  schedule: Array<{ day_of_week: number }>,
   firstClassDate: Date,
   year: number,
   month: number
 ): number {
-  const totalDays = calculateMonthlyClassDays(schedule, year, month);
-  if (totalDays === 0) return 0;
+  const firstDay = new Date(year, month - 1, 1);
+  const lastDay = new Date(year, month, 0);
+  const totalDaysInMonth = lastDay.getDate(); // 해당 월의 총 일수
   
-  const remainingDays = calculateRemainingClassDays(schedule, firstClassDate, year, month);
-  return Math.round((monthlyTuition * remainingDays) / totalDays);
+  // 첫 수업일이 해당 달의 시작일보다 이전이면 전액
+  if (firstClassDate <= firstDay) {
+    return monthlyTuition;
+  }
+  
+  // 첫 수업일이 해당 달의 마지막일보다 이후면 0
+  if (firstClassDate > lastDay) {
+    return 0;
+  }
+  
+  // 첫 수업일의 일자 (1-31)
+  const firstClassDay = firstClassDate.getDate();
+  
+  // 남은 일수 = 총 일수 - (첫 수업일 - 1)
+  const remainingDays = totalDaysInMonth - (firstClassDay - 1);
+  
+  return Math.round((monthlyTuition * remainingDays) / totalDaysInMonth);
 }
 
 /**
  * 마지막 수업일 기준으로 미수업 부분 환불 금액을 계산합니다.
+ * 해당 월의 일수 기준으로 계산합니다.
  * @param monthlyTuition 월 수강료
- * @param schedule 수업 스케줄 배열
  * @param lastClassDate 마지막 수업일
  * @param year 연도
  * @param month 월 (1-12)
@@ -122,17 +137,30 @@ export function calculateProportionalTuition(
  */
 export function calculateRefundAmount(
   monthlyTuition: number,
-  schedule: Array<{ day_of_week: number }>,
   lastClassDate: Date,
   year: number,
   month: number
 ): number {
-  const totalDays = calculateMonthlyClassDays(schedule, year, month);
-  if (totalDays === 0) return 0;
+  const firstDay = new Date(year, month - 1, 1);
+  const lastDay = new Date(year, month, 0);
+  const totalDaysInMonth = lastDay.getDate(); // 해당 월의 총 일수
   
-  const attendedDays = calculateAttendedClassDays(schedule, lastClassDate, year, month);
-  const unattendedDays = totalDays - attendedDays;
+  // 마지막 수업일이 해당 달의 시작일보다 이전이면 전액 환불
+  if (lastClassDate < firstDay) {
+    return monthlyTuition;
+  }
   
-  return Math.round((monthlyTuition * unattendedDays) / totalDays);
+  // 마지막 수업일이 해당 달의 마지막일보다 이후면 환불 없음
+  if (lastClassDate >= lastDay) {
+    return 0;
+  }
+  
+  // 마지막 수업일의 일자 (1-31)
+  const lastClassDay = lastClassDate.getDate();
+  
+  // 미수업 일수 = 총 일수 - 마지막 수업일
+  const unattendedDays = totalDaysInMonth - lastClassDay;
+  
+  return Math.round((monthlyTuition * unattendedDays) / totalDaysInMonth);
 }
 

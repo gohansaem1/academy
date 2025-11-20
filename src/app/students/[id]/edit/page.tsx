@@ -154,65 +154,55 @@ export default function EditStudentPage() {
             const course = enrollment.courses as any;
             if (!course) continue;
             
-            const schedule = course.schedule 
-              ? (typeof course.schedule === 'string' 
-                  ? JSON.parse(course.schedule) 
-                  : course.schedule)
-              : [];
+            // 현재 달 환불 계산
+            const currentYear = today.getFullYear();
+            const currentMonth = today.getMonth() + 1;
+            const currentMonthRefund = calculateRefundAmount(
+              course.tuition_fee,
+              lastClassDateObj,
+              currentYear,
+              currentMonth
+            );
             
-            if (schedule.length > 0) {
-              // 현재 달 환불 계산
-              const currentYear = today.getFullYear();
-              const currentMonth = today.getMonth() + 1;
-              const currentMonthRefund = calculateRefundAmount(
+            // 이전 달 환불 계산 (마지막 수업일이 이전 달에 있는 경우)
+            let previousMonthRefund = 0;
+            if (lastClassDateObj.getMonth() < today.getMonth() || 
+                (lastClassDateObj.getMonth() === today.getMonth() && lastClassDateObj.getFullYear() < today.getFullYear())) {
+              const previousMonth = lastClassDateObj.getMonth() + 1;
+              const previousYear = lastClassDateObj.getFullYear();
+              previousMonthRefund = calculateRefundAmount(
                 course.tuition_fee,
-                schedule,
                 lastClassDateObj,
-                currentYear,
-                currentMonth
+                previousYear,
+                previousMonth
               );
-              
-              // 이전 달 환불 계산 (마지막 수업일이 이전 달에 있는 경우)
-              let previousMonthRefund = 0;
-              if (lastClassDateObj.getMonth() < today.getMonth() || 
-                  (lastClassDateObj.getMonth() === today.getMonth() && lastClassDateObj.getFullYear() < today.getFullYear())) {
-                const previousMonth = lastClassDateObj.getMonth() + 1;
-                const previousYear = lastClassDateObj.getFullYear();
-                previousMonthRefund = calculateRefundAmount(
-                  course.tuition_fee,
-                  schedule,
-                  lastClassDateObj,
-                  previousYear,
-                  previousMonth
-                );
-              }
-              
-              // 환불 금액이 있으면 환불 결제 항목 생성
-              if (currentMonthRefund > 0) {
-                await supabase
-                  .from('payments')
-                  .insert([{
-                    student_id: params.id,
-                    course_id: enrollment.course_id,
-                    amount: currentMonthRefund,
-                    payment_method: 'transfer', // 환불은 계좌이체로
-                    payment_date: today.toISOString().split('T')[0],
-                    status: 'cancelled', // 환불은 취소 상태로 표시
-                  }]);
-              }
-              
-              if (previousMonthRefund > 0) {
-                await supabase
-                  .from('payments')
-                  .insert([{
-                    student_id: params.id,
-                    course_id: enrollment.course_id,
-                    amount: previousMonthRefund,
-                    payment_method: 'transfer',
-                    payment_date: today.toISOString().split('T')[0],
-                    status: 'cancelled',
-                  }]);
-              }
+            }
+            
+            // 환불 금액이 있으면 환불 결제 항목 생성
+            if (currentMonthRefund > 0) {
+              await supabase
+                .from('payments')
+                .insert([{
+                  student_id: params.id,
+                  course_id: enrollment.course_id,
+                  amount: currentMonthRefund,
+                  payment_method: 'transfer', // 환불은 계좌이체로
+                  payment_date: today.toISOString().split('T')[0],
+                  status: 'cancelled', // 환불은 취소 상태로 표시
+                }]);
+            }
+            
+            if (previousMonthRefund > 0) {
+              await supabase
+                .from('payments')
+                .insert([{
+                  student_id: params.id,
+                  course_id: enrollment.course_id,
+                  amount: previousMonthRefund,
+                  payment_method: 'transfer',
+                  payment_date: today.toISOString().split('T')[0],
+                  status: 'cancelled',
+                }]);
             }
           }
         }

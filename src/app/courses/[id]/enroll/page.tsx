@@ -101,20 +101,12 @@ export default function EnrollStudentPage() {
       const currentYear = today.getFullYear();
       const currentMonth = today.getMonth() + 1;
       
-      // 수업 스케줄 파싱
-      const schedule = courseData.schedule 
-        ? (typeof courseData.schedule === 'string' 
-            ? JSON.parse(courseData.schedule) 
-            : courseData.schedule)
-        : [];
-      
-      // 해당 달 남은 수업 금액 계산
+      // 해당 달 남은 수업 금액 계산 (해당 월 일수 기준)
       let currentMonthPaymentAmount = courseData.tuition_fee;
-      if (schedule.length > 0 && firstClassDate) {
+      if (firstClassDate) {
         const { calculateProportionalTuition } = await import('@/lib/utils/tuition');
         currentMonthPaymentAmount = calculateProportionalTuition(
           courseData.tuition_fee,
-          schedule,
           firstClassDate,
           currentYear,
           currentMonth
