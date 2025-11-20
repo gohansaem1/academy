@@ -6,45 +6,76 @@
 
 ## 2. 프로젝트 범위
 
-### 2.1 핵심 기능
+### 2.1 핵심 기능 (현재 구현 완료)
 
-#### 학생 관리 모듈
+#### 학생 관리 모듈 ✅
 - 학생 등록/수정/삭제
 - 학생 정보 조회 (이름, 연락처, 주소, 보호자 정보 등)
 - 학생별 수강 과목 및 이력 관리
 - 학생 검색 및 필터링
+- 학생 상세 정보에서 학습일지 조회
 
-#### 강사 관리 모듈
+#### 강사 관리 모듈 ✅
 - 강사 등록/수정/삭제
 - 강사 정보 조회 (이름, 연락처, 담당 과목 등)
 - 강사별 수업 스케줄 관리
 
-#### 수업 관리 모듈
+#### 수업 관리 모듈 ✅
 - 수업 등록/수정/삭제
 - 수업 정보 관리 (과목명, 강사, 시간, 정원 등)
 - 수업별 학생 등록 관리
 - 시간표 조회 및 관리
+- 학습일지 작성 기능
 
-#### 출석 관리 모듈
+#### 출석 관리 모듈 ✅
 - 출석 체크 (출석/지각/결석)
 - 출석 기록 조회
 - 출석 통계 (개인별, 수업별)
 - 출석 이력 관리
 
-#### 수강료 관리 모듈
-- 수강료 결제 처리
-- 결제 방법 관리 (현금, 카드, 계좌이체 등)
-- 결제 이력 조회
+#### 수강료 관리 모듈 ✅
+- 수강료 입금 확인 및 기록
+- 입금 이력 조회
 - 미납 학생 관리
 - 수강료 통계
+- 결제 안내 문자 발송 기능
 
 ### 2.2 추가 기능 (향후 개발)
 
-- 대시보드 (통계 및 요약 정보)
-- 알림 기능 (결제 알림, 출석 알림 등)
-- 리포트 생성 (출석률, 수강료 수납률 등)
-- 사용자 권한 관리 (관리자, 강사, 학생)
-- 공지사항 관리
+#### 회원 관리 및 인증 🔄
+- 사용자 가입/로그인 (ID/Password + 선택적 OAuth)
+- 역할(Role) 기반 접근 제어: STUDENT, PARENT, TEACHER, ADMIN
+- 학부모-학생 계정 연결 관계
+- 사용자 상태 관리 (active/inactive)
+
+#### 학습일지 관리 🔄
+- 수업별 학습일지 작성 (강사)
+- 학습일지 조회 (학생 상세보기에서 확인)
+- 학습 내용, 숙제, 특이사항 기록
+
+#### 공지사항 및 메시지 🔄
+- 공지사항 게시판
+- 학부모-강사 1:1 메시지
+- 수업별 그룹 알림
+- 실시간 알림 (WebSocket)
+
+#### 리포트 및 분석 🔄
+- 학생별 학습 리포트 생성
+- 출석률 통계
+- 학습일지 요약 리포트
+- 월간 리포트 PDF 생성
+
+#### 관리자 대시보드 🔄
+- 학원 전체 운영 데이터 시각화
+- 월별 수익 분석
+- 수강생 증감 분석
+- 강의 수요 분석
+
+#### 문자 발송 기능 🔄
+- 결제 안내 문자 발송
+- 출석 알림 문자 발송
+- 공지사항 문자 발송
+- SMS API 연동 (예: 알리고, 카카오톡 비즈메시지)
 
 ## 3. 기술 스택
 
@@ -59,8 +90,12 @@
 - **Supabase**: PostgreSQL 기반 백엔드 서비스
   - 데이터베이스: PostgreSQL
   - 인증: Supabase Auth (향후 구현)
-  - 실시간 기능: Supabase Realtime (향후 활용)
+  - 실시간 기능: Supabase Realtime (메시지/알림용)
 - **Supabase Client**: `@supabase/supabase-js`를 통한 데이터베이스 접근
+
+### 외부 서비스 (향후)
+- **SMS API**: 문자 발송 서비스 (알리고, 카카오톡 비즈메시지 등)
+- **OAuth**: 소셜 로그인 (Google, Kakao 등)
 
 ### 개발 도구
 - **ESLint**: 코드 품질 관리
@@ -68,51 +103,99 @@
 
 ## 4. 개발 단계
 
-### Phase 1: 기초 설정 및 UI 구성 (현재 단계)
+### Phase 1: 기초 설정 및 UI 구성 ✅
 - [x] 프로젝트 초기 설정
 - [x] 개발 문서 작성
-- [ ] 기본 레이아웃 구성
-- [ ] 네비게이션 구조 설계
+- [x] 기본 레이아웃 구성
+- [x] 네비게이션 구조 설계
+- [x] 공통 UI 컴포넌트 개발
 
-### Phase 2: 학생 관리 기능
-- [ ] 학생 등록 폼 개발
-- [ ] 학생 목록 페이지 개발
-- [ ] 학생 상세 정보 페이지 개발
-- [ ] 학생 검색 기능 구현
+### Phase 2: 학생 관리 기능 ✅
+- [x] 학생 등록 폼 개발
+- [x] 학생 목록 페이지 개발
+- [x] 학생 상세 정보 페이지 개발
+- [x] 학생 검색 기능 구현
 
-### Phase 3: 강사 관리 기능
-- [ ] 강사 등록 폼 개발
-- [ ] 강사 목록 페이지 개발
-- [ ] 강사 상세 정보 페이지 개발
+### Phase 3: 강사 관리 기능 ✅
+- [x] 강사 등록 폼 개발
+- [x] 강사 목록 페이지 개발
+- [x] 강사 상세 정보 페이지 개발
 
-### Phase 4: 수업 관리 기능
-- [ ] 수업 등록 폼 개발
-- [ ] 수업 목록 및 시간표 페이지 개발
-- [ ] 수업별 학생 등록 기능 구현
+### Phase 4: 수업 관리 기능 ✅
+- [x] 수업 등록 폼 개발
+- [x] 수업 목록 및 시간표 페이지 개발
+- [x] 수업별 학생 등록 기능 구현
+- [x] 수업 상세 정보 페이지 개발
 
-### Phase 5: 출석 관리 기능
-- [ ] 출석 체크 기능 개발
-- [ ] 출석 기록 조회 페이지 개발
-- [ ] 출석 통계 기능 구현
+### Phase 5: 출석 관리 기능 ✅
+- [x] 출석 체크 기능 개발
+- [x] 출석 기록 조회 페이지 개발
+- [ ] 출석 통계 기능 구현 (개선 필요)
+- [ ] 조퇴(early) 상태 추가
 
-### Phase 6: 수강료 관리 기능
-- [ ] 수강료 결제 처리 기능 개발
-- [ ] 결제 이력 조회 페이지 개발
-- [ ] 미납 관리 기능 구현
+### Phase 6: 수강료 관리 기능 ✅
+- [x] 수강료 입금 확인 기능 개발
+- [x] 입금 이력 조회 페이지 개발
+- [x] 미납 관리 기능 구현
+- [ ] 결제 안내 문자 발송 기능
 
-### Phase 7: 백엔드 연동
-- [ ] 데이터베이스 설계 및 구축
-- [ ] API 엔드포인트 개발
-- [ ] 프론트엔드-백엔드 연동
+### Phase 7: 학습일지 기능 🔄
+- [ ] 학습일지 작성 기능 개발
+- [ ] 학습일지 조회 기능 (학생 상세보기)
+- [ ] 학습일지 수정/삭제 기능
 
-### Phase 8: 테스트 및 배포
-- [ ] 단위 테스트 작성
-- [ ] 통합 테스트 수행
-- [ ] 프로덕션 배포
+### Phase 8: 회원 인증 및 권한 관리 🔄
+- [ ] 사용자 가입/로그인 기능
+- [ ] 역할 기반 접근 제어 구현
+- [ ] 학부모-학생 계정 연결
+- [ ] 세션 관리
+
+### Phase 9: 공지사항 및 메시지 🔄
+- [ ] 공지사항 게시판 개발
+- [ ] 1:1 메시지 기능 개발
+- [ ] 실시간 알림 기능 (WebSocket)
+- [ ] 수업별 그룹 알림
+
+### Phase 10: 리포트 및 분석 🔄
+- [ ] 학생별 학습 리포트 생성
+- [ ] 출석률 통계 대시보드
+- [ ] 월간 리포트 PDF 생성
+- [ ] 관리자 대시보드 개발
+
+### Phase 11: 문자 발송 연동 🔄
+- [ ] SMS API 연동
+- [ ] 결제 안내 문자 발송
+- [ ] 출석 알림 문자 발송
+- [ ] 공지사항 문자 발송
 
 ## 5. 데이터 모델 설계
 
-### 학생 (Student)
+### 사용자 (User) - 향후 구현
+```typescript
+{
+  id: string;
+  name: string;
+  role: 'STUDENT' | 'PARENT' | 'TEACHER' | 'ADMIN';
+  phone: string;
+  email: string;
+  password: string; // 해시화된 비밀번호
+  status: 'active' | 'inactive';
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+### 학부모-학생 관계 (ParentChild) - 향후 구현
+```typescript
+{
+  id: string;
+  parentId: string; // User ID (role: PARENT)
+  studentId: string; // User ID (role: STUDENT)
+  createdAt: Date;
+}
+```
+
+### 학생 (Student) ✅
 ```typescript
 {
   id: string;
@@ -128,7 +211,7 @@
 }
 ```
 
-### 강사 (Instructor)
+### 강사 (Instructor) ✅
 ```typescript
 {
   id: string;
@@ -142,7 +225,7 @@
 }
 ```
 
-### 수업 (Course)
+### 수업 (Course) ✅
 ```typescript
 {
   id: string;
@@ -162,19 +245,35 @@
 }
 ```
 
-### 출석 (Attendance)
+### 출석 (Attendance) ✅
 ```typescript
 {
   id: string;
   courseId: string;
   studentId: string;
   date: Date;
-  status: 'present' | 'late' | 'absent';
+  status: 'present' | 'late' | 'absent' | 'early'; // early 추가 예정
+  timestamp?: Date; // 출석 체크 시간
   createdAt: Date;
 }
 ```
 
-### 결제 (Payment)
+### 학습일지 (LearningLog) - 향후 구현
+```typescript
+{
+  id: string;
+  courseId: string;
+  date: Date; // 수업 날짜
+  content: string; // 학습 내용
+  homework?: string; // 숙제
+  notes?: string; // 특이사항
+  instructorId: string; // 작성자
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+### 수강료 입금 (Payment) ✅
 ```typescript
 {
   id: string;
@@ -183,7 +282,50 @@
   amount: number;
   paymentMethod: 'cash' | 'card' | 'transfer';
   paymentDate: Date;
-  status: 'completed' | 'pending' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'cancelled'; // confirmed로 변경
+  confirmedAt?: Date; // 입금 확인 시간
+  confirmedBy?: string; // 확인자 ID
+  smsSent: boolean; // 문자 발송 여부
+  createdAt: Date;
+}
+```
+
+### 공지사항 (Notice) - 향후 구현
+```typescript
+{
+  id: string;
+  title: string;
+  content: string;
+  targetRoles: string[]; // ['STUDENT', 'PARENT', 'TEACHER']
+  targetCourses?: string[]; // 특정 수업 대상
+  authorId: string;
+  published: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+### 메시지 (Message) - 향후 구현
+```typescript
+{
+  id: string;
+  senderId: string;
+  receiverId: string;
+  text: string;
+  read: boolean;
+  createdAt: Date;
+}
+```
+
+### 리포트 (Report) - 향후 구현
+```typescript
+{
+  id: string;
+  studentId: string;
+  month: string; // YYYY-MM
+  attendanceRate: number;
+  learningLogCount: number;
+  averageAttendance: number;
   createdAt: Date;
 }
 ```
@@ -194,29 +336,41 @@
 - **반응형 디자인**: 모바일, 태블릿, 데스크톱 모두 지원
 - **일관된 디자인 시스템**: 색상, 타이포그래피, 간격 등 일관성 유지
 - **접근성 고려**: 키보드 네비게이션, 스크린 리더 지원
+- **역할별 맞춤 UI**: 학생, 학부모, 강사, 관리자별 최적화된 인터페이스
 
 ## 7. 성능 목표
 
 - 초기 로딩 시간: 3초 이내
 - 페이지 전환 속도: 1초 이내
 - API 응답 시간: 500ms 이내
+- 실시간 메시지 지연: 1초 이내
 
 ## 8. 보안 고려사항
 
-- 사용자 인증 및 권한 관리
+- 사용자 인증 및 권한 관리 (JWT 기반)
+- 역할 기반 접근 제어 (RBAC)
 - 입력 데이터 검증 및 sanitization
-- SQL Injection 방지
+- SQL Injection 방지 (Supabase 자동 처리)
 - XSS 공격 방지
 - CSRF 토큰 사용
+- 비밀번호 해시화 (bcrypt)
+- 환경 변수를 통한 민감 정보 관리
 
 ## 9. 일정 계획
 
+### 완료된 단계 ✅
 - **1주차**: 프로젝트 설정 및 문서 작성
 - **2-3주차**: 학생 관리 기능 개발
 - **4-5주차**: 강사 및 수업 관리 기능 개발
 - **6-7주차**: 출석 및 수강료 관리 기능 개발
-- **8주차**: 백엔드 연동 및 테스트
-- **9주차**: 배포 및 문서화
+
+### 향후 계획 🔄
+- **8주차**: 학습일지 기능 개발
+- **9주차**: 회원 인증 및 권한 관리
+- **10주차**: 공지사항 및 메시지 기능
+- **11주차**: 리포트 및 대시보드 개발
+- **12주차**: 문자 발송 연동 및 최종 테스트
+- **13주차**: 배포 및 문서화
 
 ## 10. 참고 자료
 
@@ -224,4 +378,6 @@
 - [React 공식 문서](https://react.dev)
 - [Tailwind CSS 문서](https://tailwindcss.com/docs)
 - [TypeScript 핸드북](https://www.typescriptlang.org/docs/)
+- [Supabase 공식 문서](https://supabase.com/docs)
+- [Supabase Auth 문서](https://supabase.com/docs/guides/auth)
 
