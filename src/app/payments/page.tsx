@@ -73,10 +73,18 @@ export default function PaymentsPage() {
     const currentMonth = now.getMonth() + 1;
     const [selectedYear, selectedMonthNum] = selectedMonth.split('-').map(Number);
     
-    // 다음 달인지 확인
-    const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
-    const nextYear = currentMonth === 12 ? currentYear + 1 : currentYear;
+    // 다음 달 계산
+    let nextMonth: number;
+    let nextYear: number;
+    if (currentMonth === 12) {
+      nextMonth = 1;
+      nextYear = currentYear + 1;
+    } else {
+      nextMonth = currentMonth + 1;
+      nextYear = currentYear;
+    }
     
+    // 선택된 월이 다음 달인지 확인
     if (selectedYear === nextYear && selectedMonthNum === nextMonth) {
       await fetchExpectedRevenue(selectedYear, selectedMonthNum);
     } else {
