@@ -61,6 +61,16 @@ export default function PaymentsPage() {
   const [expectedRevenue, setExpectedRevenue] = useState<number | null>(null);
   const [loadingExpectedRevenue, setLoadingExpectedRevenue] = useState(false);
   const [expandedPayments, setExpandedPayments] = useState<Set<string>>(new Set());
+  const [refundRows, setRefundRows] = useState<Array<{
+    id: string;
+    student_id: string;
+    student_name: string;
+    course_id: string;
+    course_name: string;
+    amount: number;
+    last_class_date: string;
+    payment_date: string;
+  }>>([]);
   const [statistics, setStatistics] = useState({
     totalRevenue: 0,
     refundAmount: 0,
@@ -642,8 +652,18 @@ export default function PaymentsPage() {
     const totalRevenue = paymentsForStats.reduce((sum, p) => sum + p.amount, 0);
 
     // 환불 금액 계산 (그만둔 학생의 마지막 수업일이 있는 달 기준)
-    // 학생 데이터를 직접 조회하여 환불 금액 계산
+    // 학생 데이터를 직접 조회하여 환불 금액 계산 및 환불 행 생성
     let totalRefundAmount = 0;
+    const refundRowsData: Array<{
+      id: string;
+      student_id: string;
+      student_name: string;
+      course_id: string;
+      course_name: string;
+      amount: number;
+      last_class_date: string;
+      payment_date: string;
+    }> = [];
     
     try {
       // 선택된 달 계산
@@ -656,10 +676,15 @@ export default function PaymentsPage() {
         .from('students')
         .select(`
           id,
+          name,
           last_class_date,
           course_enrollments!inner(
             course_id,
-            courses!inner(tuition_fee)
+            courses!inner(
+              id,
+              name,
+              tuition_fee
+            )
           )
         `)
         .eq('status', 'inactive')
@@ -697,21 +722,38 @@ export default function PaymentsPage() {
                   lastClassYear,
                   lastClassMonth
                 );
-                totalRefundAmount += refundAmount;
+                
+                if (refundAmount > 0) {
+                  totalRefundAmount += refundAmount;
+                  
+                  // 환불 행 데이터 추가
+                  refundRowsData.push({
+                    id: `refund-${student.id}-${enrollment.course_id}`,
+                    student_id: student.id,
+                    student_name: student.name,
+                    course_id: enrollment.course_id,
+                    course_name: enrollment.courses?.name || '',
+                    amount: refundAmount,
+                    last_class_date: student.last_class_date,
+                    payment_date: lastClassDate.toISOString().split('T')[0], // 마지막 수업일을 결제일로 사용
+                  });
+                }
               }
             });
           }
         });
       }
+      
+      setRefundRows(refundRowsData);
     } catch (error) {
       console.error('환불 금액 계산 오류:', error);
     }
 
-    // 결제액 (완료/확인된 결제 금액 합계 - 환불 금액)
-    // 환불 금액을 마이너스 결제로 포함
+    // 결제액 (완료/확인된 결제 금액 합계)
+    // 환불 금액은 별도 행으로 표시되므로 여기서는 차감하지 않음
     const paidAmount = paymentsForStats
       .filter(p => p.status === 'completed' || p.status === 'confirmed')
-      .reduce((sum, p) => sum + p.amount, 0) - totalRefundAmount;
+      .reduce((sum, p) => sum + p.amount, 0);
 
     // 미납액 (결제일이 지났지만 아직 완료되지 않은 결제, 또는 상태가 pending인 결제)
     const overdueAmount = paymentsForStats
@@ -929,6 +971,46 @@ export default function PaymentsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {/* 환불 금액 행 (환불 금액 필터 선택 시 또는 전체 표시 시) */}
+              {(paymentFilter === 'refund' || paymentFilter === 'all') && refundRows
+                .filter(refundRow => {
+                  // 검색어 필터
+                  const matchesSearch = refundRow.student_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    refundRow.course_name?.toLowerCase().includes(searchTerm.toLowerCase());
+                  if (!matchesSearch) return false;
+                  
+                  // 환불 금액 필터 선택 시에만 표시
+                  if (paymentFilter === 'refund') return true;
+                  
+                  // 전체 필터일 때는 마지막 수업일이 선택된 달에 있는 환불만 표시
+                  if (!showAllPeriod) {
+                    const [selectedYear, selectedMonthNum] = selectedMonth.split('-').map(Number);
+                    const lastClassDate = new Date(refundRow.last_class_date);
+                    return lastClassDate.getFullYear() === selectedYear &&
+                           lastClassDate.getMonth() + 1 === selectedMonthNum;
+                  }
+                  return true;
+                })
+                .map((refundRow) => (
+                  <TableRow key={refundRow.id} className="bg-red-50">
+                    <TableCell></TableCell>
+                    <TableCell></TableCell>
+                    <TableCell className="font-medium">
+                      {refundRow.student_name || '-'}
+                    </TableCell>
+                    <TableCell>{refundRow.course_name || '-'}</TableCell>
+                    <TableCell className="text-red-600 font-semibold">
+                      -{refundRow.amount.toLocaleString()}원
+                    </TableCell>
+                    <TableCell className="text-gray-500">환불</TableCell>
+                    <TableCell>{refundRow.payment_date}</TableCell>
+                    <TableCell>
+                      <span className="px-2 py-1 rounded text-xs bg-red-100 text-red-800">
+                        환불
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
               {filteredPayments.map((payment) => {
                 const dueStatus = payment.dueStatus || null;
                 const statusLabel = dueStatus === 'paid' || !dueStatus 
