@@ -27,17 +27,6 @@ function NewLearningLogContent() {
   });
   const [errors, setErrors] = useState<Partial<Record<keyof LearningLogFormData, string>>>({});
 
-  if (authLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">로딩 중...</p>
-        </div>
-      </div>
-    );
-  }
-
   useEffect(() => {
     fetchCourses();
     fetchInstructors();
@@ -51,7 +40,18 @@ function NewLearningLogContent() {
         // 현재는 수동 선택으로 두겠습니다.
       }
     }
-  }, [formData.course_id]);
+  }, [formData.course_id, courses]);
+
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
 
   const fetchCourses = async () => {
     try {

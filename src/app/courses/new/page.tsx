@@ -14,6 +14,8 @@ const DAYS_OF_WEEK = ['일요일', '월요일', '화요일', '수요일', '목�
 export default function NewCoursePage() {
   const { user, loading: authLoading } = useAuth('ADMIN');
   const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [instructors, setInstructors] = useState<Instructor[]>([]);
   
   if (authLoading) {
     return (
@@ -25,9 +27,6 @@ export default function NewCoursePage() {
       </div>
     );
   }
-
-  const [saving, setSaving] = useState(false);
-  const [instructors, setInstructors] = useState<Instructor[]>([]);
 
   const [formData, setFormData] = useState<CourseFormData>({
     name: '',

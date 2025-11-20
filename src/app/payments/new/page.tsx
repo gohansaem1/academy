@@ -19,6 +19,9 @@ const PAYMENT_METHODS = {
 export default function NewPaymentPage() {
   const { user, loading: authLoading } = useAuth('ADMIN');
   const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
   
   if (authLoading) {
     return (
@@ -30,10 +33,6 @@ export default function NewPaymentPage() {
       </div>
     );
   }
-
-  const [saving, setSaving] = useState(false);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
   const [formData, setFormData] = useState<PaymentFormData>({
     student_id: '',
     course_id: '',
