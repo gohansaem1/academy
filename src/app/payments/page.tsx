@@ -61,7 +61,6 @@ export default function PaymentsPage() {
   const [expectedRevenue, setExpectedRevenue] = useState<number | null>(null);
   const [loadingExpectedRevenue, setLoadingExpectedRevenue] = useState(false);
   const [expandedPayments, setExpandedPayments] = useState<Set<string>>(new Set());
-  const [expandedPayments, setExpandedPayments] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchPayments();
