@@ -327,6 +327,24 @@ export default function PaymentsPage() {
       payment.course_name?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+  // 편집 중인 항목이 변경되었는지 확인
+  const hasChanges = (paymentId: string): boolean => {
+    const edits = editingPayments[paymentId];
+    if (!edits || Object.keys(edits).length === 0) return false;
+    
+    const payment = payments.find(p => p.id === paymentId);
+    if (!payment) return false;
+
+    if (edits.payment_method !== undefined && edits.payment_method !== payment.payment_method) return true;
+    if (edits.payment_date !== undefined && edits.payment_date !== payment.payment_date) return true;
+    if (edits.status !== undefined) {
+      const currentStatus = payment.status === 'completed' || payment.status === 'confirmed' ? 'confirmed' : 'pending';
+      if (edits.status !== currentStatus) return true;
+    }
+    
+    return false;
+  };
+
   // 통계 계산
   const calculateStatistics = () => {
     const [year, month] = selectedMonth.split('-').map(Number);
@@ -486,7 +504,6 @@ export default function PaymentsPage() {
                 <TableHead>결제 방법</TableHead>
                 <TableHead>결제일</TableHead>
                 <TableHead>확인 여부</TableHead>
-                <TableHead className="text-right">작업</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -546,34 +563,20 @@ export default function PaymentsPage() {
                         <select
                           value={editingPayments[payment.id]?.status !== undefined
                             ? editingPayments[payment.id].status!
-                            : payment.status}
-                          onChange={(e) => {
-                            handleEditPayment(payment.id, 'status', e.target.value);
-                            handleSavePayment(payment.id);
-                          }}
+                            : (payment.status === 'completed' || payment.status === 'confirmed' ? 'confirmed' : 'pending')}
+                          onChange={(e) => handleEditPayment(payment.id, 'status', e.target.value)}
                           className="flex h-8 w-32 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                         >
-                          <option value="pending">대기</option>
-                          <option value="confirmed">확인됨</option>
-                          <option value="completed">완료</option>
-                          <option value="cancelled">취소</option>
+                          <option value="pending">미납</option>
+                          <option value="confirmed">입금확인</option>
                         </select>
-                        <span className={`px-2 py-1 rounded text-sm ${statusColor}`}>
-                          {statusLabel}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        {(payment.status === 'pending' || payment.status === 'completed') && (
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleCancel(payment.id)}
-                          >
-                            취소
-                          </Button>
-                        )}
+                        <Button
+                          size="sm"
+                          onClick={() => handleSavePayment(payment.id)}
+                          disabled={!hasChanges(payment.id)}
+                        >
+                          확인
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
