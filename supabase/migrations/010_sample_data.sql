@@ -365,7 +365,7 @@ BEGIN
             homework_content,
             '수업 진행 상황 양호',
             course_record.instructor_id,
-            CASE WHEN jsonb_object_keys(student_comments) IS NOT NULL THEN student_comments ELSE NULL END,
+            CASE WHEN student_comments::text != '{}' THEN student_comments ELSE NULL END,
             NOW(),
             NOW()
           )
