@@ -77,7 +77,7 @@ export default function PaymentsPage() {
     } else {
       setExpectedRevenue(null);
     }
-  }, [selectedMonth, showAllPeriod]);
+  }, [selectedMonth, showAllPeriod, paymentFilter]);
 
   // 선택된 월이 다음 달인지 확인하고 예상 매출액 계산
   const checkIfNextMonth = async () => {
@@ -220,20 +220,32 @@ export default function PaymentsPage() {
         const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
         const endDate = new Date(year, month, 0).toISOString().split('T')[0];
 
-        // 해당 달의 결제 데이터 조회 (학생의 결제일 정보 포함, 재학생만)
-        const { data: monthData, error: monthError } = await supabase
+        // 해당 달의 결제 데이터 조회 (환불 금액 필터 사용 시 그만둔 학생의 결제도 포함)
+        // 환불 금액 필터 사용 시 마지막 수업일이 선택된 달에 있는 그만둔 학생의 모든 결제 조회
+        let query = supabase
           .from('payments')
           .select(`
             *,
             students(name, payment_due_day, status, first_class_date, last_class_date),
             courses(name, tuition_fee)
-          `)
-          .gte('payment_date', startDate)
-          .lte('payment_date', endDate)
-          .order('payment_date', { ascending: false })
-          .order('created_at', { ascending: false });
+          `);
+        
+        if (paymentFilter === 'refund') {
+          // 환불 금액 필터: 마지막 수업일이 선택된 달에 있는 그만둔 학생의 모든 결제 조회
+          // 결제일 제한 없이 모든 결제 조회 (나중에 필터링)
+          query = query.order('payment_date', { ascending: false })
+                       .order('created_at', { ascending: false });
+        } else {
+          // 일반 필터: 해당 달의 결제만 조회
+          query = query.gte('payment_date', startDate)
+                       .lte('payment_date', endDate)
+                       .order('payment_date', { ascending: false })
+                       .order('created_at', { ascending: false });
+        }
+        
+        const { data: monthData, error: monthError } = await query;
 
-        // 재학생만 필터링 및 데이터 매핑 (환불 금액 필터 사용 시 그만둔 학생도 포함)
+        // 환불 금액 필터 사용 시 그만둔 학생도 포함, 아니면 재학생만
         const filteredMonthData = (monthData || []).map((payment: any) => ({
           ...payment,
           student_payment_due_day: payment.students?.payment_due_day,
@@ -557,13 +569,18 @@ export default function PaymentsPage() {
                  firstClassDate.getMonth() === paymentDateForFirst.getMonth() &&
                  payment.status !== 'cancelled';
         case 'refund':
-          // 환불 금액: 학생이 그만둔 상태이고 마지막 수업일이 결제일과 같은 달에 있는 경우
+          // 환불 금액: 학생이 그만둔 상태이고 마지막 수업일이 선택된 달에 있는 경우
           if (payment.student_status !== 'inactive' || !payment.student_last_class_date) return false;
           const lastClassDate = new Date(payment.student_last_class_date);
-          const paymentDateForRefund = new Date(payment.payment_date);
-          return lastClassDate.getFullYear() === paymentDateForRefund.getFullYear() &&
-                 lastClassDate.getMonth() === paymentDateForRefund.getMonth() &&
-                 payment.status !== 'cancelled';
+          // 전체 기간이 아닐 때는 마지막 수업일이 선택된 달에 있는지 확인
+          if (!showAllPeriod) {
+            const [selectedYear, selectedMonthNum] = selectedMonth.split('-').map(Number);
+            return lastClassDate.getFullYear() === selectedYear &&
+                   lastClassDate.getMonth() + 1 === selectedMonthNum &&
+                   payment.status !== 'cancelled';
+          }
+          // 전체 기간일 때는 그만둔 학생의 모든 결제 표시
+          return payment.status !== 'cancelled';
         case 'all':
         default:
           // 전체: 취소 제외
