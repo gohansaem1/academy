@@ -39,6 +39,7 @@ export default function EditStudentPage() {
 
       if (error) throw error;
 
+      setCurrentStudent(data);
       setFormData({
         name: data.name,
         phone: data.phone,
@@ -47,7 +48,6 @@ export default function EditStudentPage() {
         guardian_name: data.guardian_name,
         guardian_phone: data.guardian_phone,
         payment_due_day: data.payment_due_day || undefined,
-        status: data.status || 'active',
         first_class_date: data.first_class_date || undefined,
       });
     } catch (error) {
@@ -101,6 +101,13 @@ export default function EditStudentPage() {
         .eq('id', params.id)
         .single();
       
+      // 현재 학생 정보 조회 (마지막 수업일 확인용)
+      const { data: currentStudent } = await supabase
+        .from('students')
+        .select('last_class_date')
+        .eq('id', params.id)
+        .single();
+      
       const updateData: any = {
         name: formData.name,
         phone: formData.phone,
@@ -109,12 +116,11 @@ export default function EditStudentPage() {
         guardian_name: formData.guardian_name,
         guardian_phone: formData.guardian_phone,
         payment_due_day: formData.payment_due_day || null,
-        status: formData.status || 'active',
         first_class_date: formData.first_class_date || null,
       };
       
+      // 마지막 수업일이 변경되었고, 현재 날짜보다 이전이면 자동으로 그만둔 상태로 변경됨
       // 상태는 자동으로 업데이트되므로 수동 변경 불가
-      // 마지막 수업일만 업데이트 가능 (마지막 수업일이 현재보다 이전이면 자동으로 그만둔 상태로 변경됨)
       
       const { error } = await supabase
         .from('students')
@@ -227,17 +233,32 @@ export default function EditStudentPage() {
 
         <div>
           <label className="block text-sm font-medium mb-1 text-gray-700">
-            학생 상태
+            마지막 수업일
           </label>
-          <select
-            value={formData.status || 'active'}
-            onChange={(e) => setFormData({ ...formData, status: e.target.value as 'active' | 'inactive' })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="active">재학</option>
-            <option value="inactive">그만둔</option>
-          </select>
-          <p className="mt-1 text-sm text-gray-500">학생의 현재 상태를 선택하세요</p>
+          <Input
+            type="date"
+            value={currentStudent?.last_class_date || ''}
+            onChange={async (e) => {
+              const lastClassDate = e.target.value || null;
+              // 마지막 수업일 업데이트 (상태는 자동으로 업데이트됨)
+              await supabase
+                .from('students')
+                .update({ last_class_date: lastClassDate })
+                .eq('id', params.id);
+              
+              // 자동 상태 업데이트 확인
+              const { autoUpdateStudentStatusIfNeeded } = await import('@/lib/utils/student-status');
+              await autoUpdateStudentStatusIfNeeded(
+                params.id as string,
+                'active',
+                lastClassDate
+              );
+              
+              // 폼 데이터 새로고침
+              fetchStudent(params.id as string);
+            }}
+          />
+          <p className="mt-1 text-sm text-gray-500">마지막 수업일을 입력하세요. 현재 날짜보다 이전이면 자동으로 그만둔 상태로 변경됩니다.</p>
         </div>
 
         <div className="flex gap-2 pt-4">
