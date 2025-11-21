@@ -1064,7 +1064,7 @@ export default function PaymentsPage() {
                                   .eq('last_class_date', refundRow.last_class_date)
                                   .maybeSingle();
                                 
-                                if (existingRefund && !checkError) {
+                                if (existingRefund) {
                                   // 기존 레코드 업데이트
                                   const { error: updateError } = await supabase
                                     .from('refunds')
@@ -1078,7 +1078,21 @@ export default function PaymentsPage() {
                                     .from('refunds')
                                     .insert([refundData]);
                                   
-                                  if (insertError) throw insertError;
+                                  if (insertError) {
+                                    // UNIQUE 제약 조건 위반 시 업데이트 시도
+                                    if (insertError.code === '23505') {
+                                      const { error: updateError } = await supabase
+                                        .from('refunds')
+                                        .update({ status: newStatus })
+                                        .eq('student_id', refundRow.student_id)
+                                        .eq('course_id', refundRow.course_id)
+                                        .eq('last_class_date', refundRow.last_class_date);
+                                      
+                                      if (updateError) throw updateError;
+                                    } else {
+                                      throw insertError;
+                                    }
+                                  }
                                 }
                                 
                                 // 로컬 상태 업데이트
