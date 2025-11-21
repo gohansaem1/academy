@@ -20,6 +20,8 @@ export default function CourseDetailPage() {
   const [enrollments, setEnrollments] = useState<CourseEnrollment[]>([]);
   const [learningLogs, setLearningLogs] = useState<LearningLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 9; // 한 페이지에 표시할 카드 수
 
   useEffect(() => {
     if (params.id) {
@@ -330,77 +332,126 @@ export default function CourseDetailPage() {
             등록된 학습일지가 없습니다.
           </div>
         ) : (
-          <div className="space-y-4">
-            {learningLogs.map((log) => (
-              <div key={log.id} className="bg-white border rounded-lg p-4">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <p className="text-sm text-gray-500">
-                      {new Date(log.date).toLocaleDateString('ko-KR')} | 작성자: {log.instructor_name || '-'}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Link href={`/learning-logs/${log.id}/edit`}>
-                      <Button variant="outline" size="sm">수정</Button>
-                    </Link>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleDeleteLog(log.id)}
-                    >
-                      삭제
-                    </Button>
-                  </div>
-                </div>
-                <div className="mt-3 space-y-2">
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">학습 내용</label>
-                    <div className="text-sm mt-1">
-                      <p className="whitespace-pre-wrap">
-                        {log.content}
-                        {log.student_comments && Object.keys(log.student_comments).length > 0 && (
-                          <>
-                            {Object.entries(log.student_comments).map(([studentId, comment]) => {
-                              // 학생이 볼 때는 자신의 코멘트만 표시
-                              if (user?.role === 'STUDENT' && studentId !== user.id) {
-                                return null;
-                              }
-                              // 관리자/강사가 볼 때는 학생 이름도 함께 표시
-                              const studentName = (log as any).studentsMap?.get(studentId) || '학생';
-                              return (
-                                <span key={studentId}>
-                                  {'\n\n'}
-                                  {user?.role !== 'STUDENT' && (
-                                    <>
-                                      {studentName}
-                                      {'\n'}
-                                    </>
-                                  )}
-                                  {comment as string}
-                                </span>
-                              );
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+              {learningLogs
+                .slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
+                .map((log) => {
+                  // 텍스트 자르기 함수
+                  const truncateText = (text: string, maxLength: number) => {
+                    if (!text) return '';
+                    if (text.length <= maxLength) return text;
+                    return text.substring(0, maxLength) + '...';
+                  };
+
+                  // 학생 코멘트 요약
+                  let commentsSummary = '';
+                  if (log.student_comments && Object.keys(log.student_comments).length > 0) {
+                    const comments = Object.entries(log.student_comments)
+                      .filter(([studentId]) => {
+                        if (user?.role === 'STUDENT' && studentId !== user.id) {
+                          return false;
+                        }
+                        return true;
+                      })
+                      .map(([studentId, comment]) => {
+                        const studentName = (log as any).studentsMap?.get(studentId) || '학생';
+                        return user?.role !== 'STUDENT' 
+                          ? `${studentName}: ${comment}` 
+                          : comment as string;
+                      });
+                    commentsSummary = comments.join('\n');
+                  }
+
+                  return (
+                    <div key={log.id} className="bg-white border rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900 mb-1">
+                            {new Date(log.date).toLocaleDateString('ko-KR', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
                             })}
-                          </>
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            작성자: {log.instructor_name || '-'}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Link href={`/learning-logs/${log.id}/edit`}>
+                            <Button variant="outline" size="sm">수정</Button>
+                          </Link>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDeleteLog(log.id)}
+                          >
+                            삭제
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2 mb-3">
+                        <div>
+                          <label className="text-xs font-medium text-gray-500">학습 내용</label>
+                          <p className="text-sm text-gray-700 mt-1 line-clamp-3">
+                            {truncateText(log.content || '', 100)}
+                            {commentsSummary && (
+                              <>
+                                {'\n\n'}
+                                {truncateText(commentsSummary, 50)}
+                              </>
+                            )}
+                          </p>
+                        </div>
+                        {log.homework && (
+                          <div>
+                            <label className="text-xs font-medium text-gray-500">숙제</label>
+                            <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                              {truncateText(log.homework, 60)}
+                            </p>
+                          </div>
                         )}
-                      </p>
+                        {log.notes && (
+                          <div>
+                            <label className="text-xs font-medium text-gray-500">특이사항</label>
+                            <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                              {truncateText(log.notes, 60)}
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  {log.homework && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">숙제</label>
-                      <p className="text-sm mt-1 whitespace-pre-wrap">{log.homework}</p>
-                    </div>
-                  )}
-                  {log.notes && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">특이사항</label>
-                      <p className="text-sm mt-1 whitespace-pre-wrap">{log.notes}</p>
-                    </div>
-                  )}
-                </div>
+                  );
+                })}
+            </div>
+
+            {/* 페이지네이션 */}
+            {Math.ceil(learningLogs.length / ITEMS_PER_PAGE) > 1 && (
+              <div className="flex justify-center items-center gap-2 mt-6">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                >
+                  이전
+                </Button>
+                <span className="text-sm text-gray-600">
+                  {currentPage} / {Math.ceil(learningLogs.length / ITEMS_PER_PAGE)}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(Math.ceil(learningLogs.length / ITEMS_PER_PAGE), prev + 1))}
+                  disabled={currentPage === Math.ceil(learningLogs.length / ITEMS_PER_PAGE)}
+                >
+                  다음
+                </Button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
 
