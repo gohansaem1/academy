@@ -462,7 +462,7 @@ BEGIN
       
       -- 결제 생성 (금액이 0보다 큰 경우만)
       IF payment_amount > 0 THEN
-        INSERT INTO payments (student_id, course_id, amount, payment_method, payment_date, status, created_at)
+        INSERT INTO payments (student_id, course_id, amount, payment_method, payment_date, status, type, created_at)
         VALUES (
           enrollment_record.student_id,
           enrollment_record.course_id,
@@ -474,6 +474,7 @@ BEGIN
               CASE WHEN RANDOM() < 0.7 THEN 'confirmed' ELSE 'pending' END
             ELSE 'pending'
           END,
+          'payment', -- 결제 타입
           payment_date
         )
         ON CONFLICT DO NOTHING;
@@ -481,6 +482,54 @@ BEGIN
       
       current_month_start := DATE_TRUNC('month', current_month_start) + INTERVAL '1 month';
     END LOOP;
+    
+    -- 그만둔 학생이고 마지막 수업일이 있으면 환불 항목 생성
+    IF student_record.status = 'inactive' AND last_class_date_val IS NOT NULL THEN
+      -- 마지막 수업일이 속한 달의 환불 금액 계산
+      DECLARE
+        refund_year INTEGER;
+        refund_month INTEGER;
+        refund_amount INTEGER;
+        refund_date DATE;
+        total_days_in_refund_month INTEGER;
+        last_class_day INTEGER;
+        unattended_days INTEGER;
+      BEGIN
+        refund_year := EXTRACT(YEAR FROM last_class_date_val)::INTEGER;
+        refund_month := EXTRACT(MONTH FROM last_class_date_val)::INTEGER;
+        refund_date := DATE_TRUNC('month', last_class_date_val) + (due_day - 1) * INTERVAL '1 day';
+        
+        -- 해당 달의 총 일수 계산
+        total_days_in_refund_month := EXTRACT(DAY FROM (DATE_TRUNC('month', last_class_date_val) + INTERVAL '1 month' - INTERVAL '1 day'))::INTEGER;
+        
+        -- 마지막 수업일의 일자
+        last_class_day := EXTRACT(DAY FROM last_class_date_val)::INTEGER;
+        
+        -- 미수업 일수 = 총 일수 - 마지막 수업일
+        unattended_days := total_days_in_refund_month - last_class_day;
+        
+        -- 환불 금액 계산 (해당 월 일수 기준)
+        IF unattended_days > 0 THEN
+          refund_amount := ROUND((course_record.tuition_fee::NUMERIC * unattended_days) / total_days_in_refund_month);
+          
+          -- 환불 항목 생성 (음수 금액으로 저장)
+          IF refund_amount > 0 THEN
+            INSERT INTO payments (student_id, course_id, amount, payment_method, payment_date, status, type, created_at)
+            VALUES (
+              enrollment_record.student_id,
+              enrollment_record.course_id,
+              -refund_amount, -- 음수로 저장
+              'card',
+              refund_date,
+              CASE WHEN RANDOM() < 0.5 THEN 'pending' ELSE 'confirmed' END, -- 50% 확률로 미지급/환불확인
+              'refund', -- 환불 타입
+              refund_date
+            )
+            ON CONFLICT DO NOTHING;
+          END IF;
+        END IF;
+      END;
+    END IF;
   END LOOP;
 END $$;
 
