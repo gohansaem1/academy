@@ -36,6 +36,7 @@ export default function LearningLogsPage() {
   const [allLearningLogs, setAllLearningLogs] = useState<LearningLog[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [showListView, setShowListView] = useState(false);
+  const [pendingEdit, setPendingEdit] = useState<{ date: string; courseId: string } | null>(null);
 
   useEffect(() => {
     if (!authLoading) {
@@ -45,6 +46,18 @@ export default function LearningLogsPage() {
       }
     }
   }, [authLoading, selectedDate, showListView]);
+
+  // 목록보기에서 수정 버튼 클릭 시 처리
+  useEffect(() => {
+    if (!showListView && pendingEdit && courses.length > 0) {
+      // 해당 날짜의 수업 목록이 로드된 후 수업 선택
+      const courseExists = courses.some(c => c.id === pendingEdit.courseId);
+      if (courseExists) {
+        setSelectedCourseId(pendingEdit.courseId);
+        setPendingEdit(null);
+      }
+    }
+  }, [showListView, pendingEdit, courses]);
 
   useEffect(() => {
     if (selectedCourseId) {
@@ -611,11 +624,9 @@ export default function LearningLogsPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          setShowListView(false);
+                          setPendingEdit({ date: log.date, courseId: log.course_id });
                           setSelectedDate(log.date);
-                          setTimeout(() => {
-                            setSelectedCourseId(log.course_id);
-                          }, 100);
+                          setShowListView(false);
                         }}
                       >
                         수정
