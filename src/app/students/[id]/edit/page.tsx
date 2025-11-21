@@ -97,6 +97,9 @@ export default function EditStudentPage() {
     try {
       setSaving(true);
       
+      const oldFirstClassDate = currentStudent?.first_class_date || null;
+      const newFirstClassDate = formData.first_class_date || null;
+      
       const updateData: any = {
         name: formData.name,
         phone: formData.phone,
@@ -105,7 +108,7 @@ export default function EditStudentPage() {
         guardian_name: formData.guardian_name,
         guardian_phone: formData.guardian_phone,
         payment_due_day: formData.payment_due_day || null,
-        first_class_date: formData.first_class_date || null,
+        first_class_date: newFirstClassDate,
       };
       
       // 상태는 자동으로 업데이트되므로 수동 변경 불가
@@ -117,6 +120,16 @@ export default function EditStudentPage() {
         .eq('id', params.id);
 
       if (error) throw error;
+
+      // 첫 수업일이 변경되었으면 결제 항목 업데이트
+      if (oldFirstClassDate !== newFirstClassDate) {
+        const { updatePaymentsForFirstClassDate } = await import('@/lib/utils/payment-cleanup');
+        await updatePaymentsForFirstClassDate(
+          params.id as string,
+          newFirstClassDate,
+          oldFirstClassDate
+        );
+      }
 
       alert('학생 정보가 수정되었습니다.');
       router.push(`/students/${params.id}`);
@@ -251,12 +264,14 @@ export default function EditStudentPage() {
                   lastClassDateValue
                 );
                 
-                // 마지막 수업일이 새로 입력되었거나 변경되었고, 학생이 inactive 상태이면 환불 생성
-                if (lastClassDateValue && 
-                    (statusChanged || currentStudent?.status === 'inactive') &&
-                    lastClassDateValue !== previousLastClassDate) {
-                  const { createRefundForInactiveStudent } = await import('@/lib/utils/refund');
-                  await createRefundForInactiveStudent(params.id as string, lastClassDateValue);
+                // 마지막 수업일이 변경되었으면 환불 항목 재생성
+                if (lastClassDateValue !== previousLastClassDate) {
+                  const { updateRefundsForLastClassDate } = await import('@/lib/utils/payment-cleanup');
+                  await updateRefundsForLastClassDate(
+                    params.id as string,
+                    lastClassDateValue,
+                    previousLastClassDate
+                  );
                 }
                 
                 // 폼 데이터 새로고침
