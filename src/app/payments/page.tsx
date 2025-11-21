@@ -1268,31 +1268,58 @@ export default function PaymentsPage() {
                       </TableCell>
                       <TableCell>
                         <select
-                          value="refund"
-                          disabled
-                          className="flex h-8 w-full rounded-md border border-gray-300 bg-gray-100 px-2 py-1 text-sm text-gray-500 cursor-not-allowed"
+                          value={editingRefunds[refundRow.id]?.payment_method !== undefined
+                            ? editingRefunds[refundRow.id].payment_method!
+                            : (refundRow.payment_method || 'card')}
+                          onChange={(e) => {
+                            setEditingRefunds({
+                              ...editingRefunds,
+                              [refundRow.id]: {
+                                ...editingRefunds[refundRow.id],
+                                payment_method: e.target.value,
+                              },
+                            });
+                          }}
+                          onBlur={() => handleSaveRefund(refundRow.id)}
+                          className="flex h-8 w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                         >
-                          <option value="refund">환불</option>
+                          <option value="card">카드</option>
+                          <option value="cash">현금</option>
+                          <option value="transfer">계좌이체</option>
                         </select>
                       </TableCell>
                       <TableCell>
                         <Input
                           type="date"
-                          value={refundRow.payment_date}
-                          disabled
-                          className="w-40 bg-gray-100 cursor-not-allowed"
+                          value={editingRefunds[refundRow.id]?.payment_date !== undefined
+                            ? editingRefunds[refundRow.id].payment_date!
+                            : refundRow.payment_date}
+                          onChange={(e) => {
+                            setEditingRefunds({
+                              ...editingRefunds,
+                              [refundRow.id]: {
+                                ...editingRefunds[refundRow.id],
+                                payment_date: e.target.value,
+                              },
+                            });
+                          }}
+                          onBlur={() => handleSaveRefund(refundRow.id)}
+                          className="w-40"
                         />
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <select
-                            value={editingRefundStatus[refundRow.id] !== undefined
-                              ? editingRefundStatus[refundRow.id]
+                            value={editingRefunds[refundRow.id]?.status !== undefined
+                              ? editingRefunds[refundRow.id].status!
                               : currentStatus}
                             onChange={(e) => {
-                              setEditingRefundStatus({
-                                ...editingRefundStatus,
-                                [refundRow.id]: e.target.value as 'pending' | 'confirmed',
+                              setEditingRefunds({
+                                ...editingRefunds,
+                                [refundRow.id]: {
+                                  ...editingRefunds[refundRow.id],
+                                  status: e.target.value as 'pending' | 'confirmed',
+                                },
                               });
                             }}
                             className="flex h-8 w-32 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
@@ -1300,79 +1327,10 @@ export default function PaymentsPage() {
                             <option value="pending">미지급</option>
                             <option value="confirmed">환불확인</option>
                           </select>
-                          {editingRefundStatus[refundRow.id] !== undefined && (
+                          {hasRefundChanges(refundRow.id) && (
                             <Button
                               size="sm"
-                              onClick={async () => {
-                                try {
-                                  const newStatus = editingRefundStatus[refundRow.id];
-                                  
-                                  // DB에 환불 상태 저장 또는 업데이트
-                                  const refundData = {
-                                    student_id: refundRow.student_id,
-                                    course_id: refundRow.course_id,
-                                    amount: refundRow.amount,
-                                    last_class_date: refundRow.last_class_date,
-                                    status: newStatus,
-                                  };
-                                  
-                                  // 기존 환불 레코드 확인
-                                  const { data: existingRefund, error: checkError } = await supabase
-                                    .from('refunds')
-                                    .select('id')
-                                    .eq('student_id', refundRow.student_id)
-                                    .eq('course_id', refundRow.course_id)
-                                    .eq('last_class_date', refundRow.last_class_date)
-                                    .maybeSingle();
-                                  
-                                  if (existingRefund) {
-                                    // 기존 레코드 업데이트
-                                    const { error: updateError } = await supabase
-                                      .from('refunds')
-                                      .update({ status: newStatus })
-                                      .eq('id', existingRefund.id);
-                                    
-                                    if (updateError) throw updateError;
-                                  } else {
-                                    // 새 레코드 생성
-                                    const { error: insertError } = await supabase
-                                      .from('refunds')
-                                      .insert([refundData]);
-                                    
-                                    if (insertError) {
-                                      // UNIQUE 제약 조건 위반 시 업데이트 시도
-                                      if (insertError.code === '23505') {
-                                        const { error: updateError } = await supabase
-                                          .from('refunds')
-                                          .update({ status: newStatus })
-                                          .eq('student_id', refundRow.student_id)
-                                          .eq('course_id', refundRow.course_id)
-                                          .eq('last_class_date', refundRow.last_class_date);
-                                        
-                                        if (updateError) throw updateError;
-                                      } else {
-                                        throw insertError;
-                                      }
-                                    }
-                                  }
-                                  
-                                  // 로컬 상태 업데이트
-                                  const updatedRefundRows = refundRows.map(row => 
-                                    row.id === refundRow.id 
-                                      ? { ...row, status: newStatus }
-                                      : row
-                                  );
-                                  setRefundRows(updatedRefundRows);
-                                  
-                                  // 편집 상태 초기화
-                                  const newEditingStatus = { ...editingRefundStatus };
-                                  delete newEditingStatus[refundRow.id];
-                                  setEditingRefundStatus(newEditingStatus);
-                                } catch (error) {
-                                  console.error('환불 상태 수정 오류:', error);
-                                  alert('환불 상태 수정 중 오류가 발생했습니다.');
-                                }
-                              }}
+                              onClick={() => handleSaveRefund(refundRow.id)}
                             >
                               확인
                             </Button>
