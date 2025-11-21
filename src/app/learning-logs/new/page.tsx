@@ -69,13 +69,13 @@ export default function NewLearningLogPage() {
       if (error) throw error;
 
       // 해당 날짜의 요일에 수업이 있는지 확인
-      const coursesForDate = (data || []).filter(course => {
+      const coursesForDate = (data || []).filter((course: Course) => {
         if (course.schedule && Array.isArray(course.schedule) && course.schedule.length > 0) {
           // 새로운 schedule 필드 사용
-          return course.schedule.some(s => s.day_of_week === dayOfWeek);
+          return course.schedule.some((s: { day_of_week: number }) => s.day_of_week === dayOfWeek);
         } else {
           // 기존 day_of_week 필드 사용 (하위 호환성)
-          return course.day_of_week === dayOfWeek;
+          return (course as any).day_of_week === dayOfWeek;
         }
       });
 
