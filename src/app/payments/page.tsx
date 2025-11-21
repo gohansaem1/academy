@@ -75,9 +75,10 @@ export default function PaymentsPage() {
     amount: number;
     last_class_date: string;
     payment_date: string;
+    payment_method?: string;
     status?: 'pending' | 'confirmed';
   }>>([]);
-  const [editingRefundStatus, setEditingRefundStatus] = useState<Record<string, 'pending' | 'confirmed'>>({});
+  const [editingRefunds, setEditingRefunds] = useState<Record<string, { payment_method?: string; payment_date?: string; status?: 'pending' | 'confirmed' }>>({});
   const [statistics, setStatistics] = useState({
     totalRevenue: 0,
     refundAmount: 0,
@@ -581,6 +582,113 @@ export default function PaymentsPage() {
     return `${year}-${String(month).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`;
   };
 
+  // 환불 변경사항 확인
+  const hasRefundChanges = (refundId: string): boolean => {
+    const edits = editingRefunds[refundId];
+    if (!edits || Object.keys(edits).length === 0) return false;
+    
+    const refund = refundRows.find(r => r.id === refundId);
+    if (!refund) return false;
+
+    if (edits.payment_method !== undefined && edits.payment_method !== (refund.payment_method || 'card')) return true;
+    if (edits.payment_date !== undefined && edits.payment_date !== refund.payment_date) return true;
+    if (edits.status !== undefined && edits.status !== (refund.status || 'pending')) return true;
+    
+    return false;
+  };
+
+  // 환불 저장
+  const handleSaveRefund = async (refundId: string) => {
+    const edits = editingRefunds[refundId];
+    if (!edits || Object.keys(edits).length === 0) return;
+
+    try {
+      const refund = refundRows.find(r => r.id === refundId);
+      if (!refund) return;
+
+      const updateData: any = {};
+      if (edits.payment_method !== undefined) updateData.payment_method = edits.payment_method;
+      if (edits.payment_date !== undefined) updateData.payment_date = edits.payment_date;
+      if (edits.status !== undefined) updateData.status = edits.status;
+
+      // 기존 환불 레코드 확인
+      const { data: existingRefund, error: checkError } = await supabase
+        .from('refunds')
+        .select('id')
+        .eq('student_id', refund.student_id)
+        .eq('course_id', refund.course_id)
+        .eq('last_class_date', refund.last_class_date)
+        .maybeSingle();
+      
+      if (existingRefund) {
+        // 기존 레코드 업데이트
+        const { error: updateError } = await supabase
+          .from('refunds')
+          .update(updateData)
+          .eq('id', existingRefund.id);
+        
+        if (updateError) throw updateError;
+      } else {
+        // 새 레코드 생성
+        const refundData = {
+          student_id: refund.student_id,
+          course_id: refund.course_id,
+          amount: refund.amount,
+          last_class_date: refund.last_class_date,
+          payment_method: updateData.payment_method || refund.payment_method || 'card',
+          payment_date: updateData.payment_date || refund.payment_date,
+          status: updateData.status || refund.status || 'pending',
+        };
+        
+        const { error: insertError } = await supabase
+          .from('refunds')
+          .insert([refundData]);
+        
+        if (insertError) {
+          // UNIQUE 제약 조건 위반 시 업데이트 시도
+          if (insertError.code === '23505') {
+            const { error: updateError } = await supabase
+              .from('refunds')
+              .update(updateData)
+              .eq('student_id', refund.student_id)
+              .eq('course_id', refund.course_id)
+              .eq('last_class_date', refund.last_class_date);
+            
+            if (updateError) throw updateError;
+          } else {
+            throw insertError;
+          }
+        }
+      }
+
+      // 로컬 상태 업데이트
+      const updatedRefundRows = refundRows.map(row => 
+        row.id === refundId 
+          ? { 
+              ...row, 
+              payment_method: edits.payment_method !== undefined ? edits.payment_method : row.payment_method,
+              payment_date: edits.payment_date !== undefined ? edits.payment_date : row.payment_date,
+              status: edits.status !== undefined ? edits.status : row.status,
+            }
+          : row
+      );
+      setRefundRows(updatedRefundRows);
+
+      // 편집 상태 초기화
+      setEditingRefunds(prev => {
+        const newState = { ...prev };
+        delete newState[refundId];
+        return newState;
+      });
+
+      // 통계 재계산
+      calculateStatistics().then(setStatistics).catch(console.error);
+    } catch (error) {
+      console.error('환불 수정 오류:', error);
+      alert('환불 수정 중 오류가 발생했습니다.');
+    }
+  };
+
   // 해당 달의 결제만 필터링 (표시용, 전체 기간이 아닐 때만)
   // 환불 금액 필터 사용 시 마지막 수업일이 선택된 달에 있는 그만둔 학생의 모든 결제 표시
   const currentMonthPayments = showAllPeriod
@@ -774,11 +882,15 @@ export default function PaymentsPage() {
           .in('student_id', studentIds)
           .in('course_id', courseIds);
         
-        const refundsMap = new Map<string, 'pending' | 'confirmed'>();
+        const refundsMap = new Map<string, { status: 'pending' | 'confirmed'; payment_method?: string; payment_date?: string }>();
         if (existingRefunds && !refundsError) {
           existingRefunds.forEach((refund: any) => {
             const key = `${refund.student_id}-${refund.course_id}-${refund.last_class_date}`;
-            refundsMap.set(key, refund.status);
+            refundsMap.set(key, {
+              status: refund.status,
+              payment_method: refund.payment_method,
+              payment_date: refund.payment_date,
+            });
           });
         }
         inactiveStudents.forEach((student: any) => {
@@ -805,7 +917,7 @@ export default function PaymentsPage() {
                   
                   // 환불 행 데이터 추가
                   const refundKey = `${student.id}-${enrollment.course_id}-${student.last_class_date}`;
-                  const existingStatus = refundsMap.get(refundKey) || 'pending';
+                  const existingRefund = refundsMap.get(refundKey);
                   
                   refundRowsData.push({
                     id: `refund-${refundKey}`,
@@ -815,8 +927,9 @@ export default function PaymentsPage() {
                     course_name: enrollment.courses?.name || '',
                     amount: refundAmount,
                     last_class_date: student.last_class_date,
-                    payment_date: lastClassDate.toISOString().split('T')[0], // 마지막 수업일을 결제일로 사용
-                    status: existingStatus, // DB에서 조회한 상태 또는 기본값: 미지급
+                    payment_date: existingRefund?.payment_date || lastClassDate.toISOString().split('T')[0], // DB에서 조회한 결제일 또는 마지막 수업일
+                    payment_method: existingRefund?.payment_method || 'card', // DB에서 조회한 결제 방법 또는 기본값: 카드
+                    status: existingRefund?.status || 'pending', // DB에서 조회한 상태 또는 기본값: 미지급
                   });
                 }
               }
