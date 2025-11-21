@@ -372,14 +372,15 @@ function StudentDetailContent() {
           </div>
         )}
 
-        {student.status === 'inactive' && student.last_class_date && (
-          <div>
-            <label className="text-sm font-medium text-gray-500">마지막 수업일자</label>
-            <p className="text-lg mt-1">
-              {new Date(student.last_class_date).toLocaleDateString('ko-KR')}
-            </p>
-          </div>
-        )}
+        <div>
+          <label className="text-sm font-medium text-gray-500">마지막 수업일</label>
+          <p className="text-lg mt-1">
+            {student.last_class_date 
+              ? new Date(student.last_class_date).toLocaleDateString('ko-KR')
+              : '-'
+            }
+          </p>
+        </div>
 
         <div>
           <label className="text-sm font-medium text-gray-500">등록일</label>
