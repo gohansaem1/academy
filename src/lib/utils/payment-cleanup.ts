@@ -103,6 +103,7 @@ export async function updatePaymentsForFirstClassDate(
       const firstMonth = newFirstDate.getMonth() + 1;
       const firstMonthStart = new Date(firstYear, firstMonth - 1, 1);
       const firstMonthStartStr = firstMonthStart.toISOString().split('T')[0];
+      const firstMonthEnd = new Date(firstYear, firstMonth, 0);
 
       // 새로운 첫 수업일 이전 달의 모든 결제 항목 삭제
       // (첫 수업일이 속한 달의 결제 항목은 삭제하지 않고 업데이트)
@@ -115,10 +116,6 @@ export async function updatePaymentsForFirstClassDate(
         .lt('payment_date', firstMonthStartStr);
 
       // 새로운 첫 수업일이 속한 달의 결제 항목이 있는지 확인
-      const firstYear = newFirstDate.getFullYear();
-      const firstMonth = newFirstDate.getMonth() + 1;
-      const firstMonthStart = new Date(firstYear, firstMonth - 1, 1);
-      const firstMonthEnd = new Date(firstYear, firstMonth, 0);
 
       // 해당 달의 결제 항목 조회
       const { data: existingPayments } = await supabase
