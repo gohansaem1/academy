@@ -324,9 +324,6 @@ export default function CourseDetailPage() {
       <div className="mt-8">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-semibold">학습일지 ({learningLogs.length}개)</h2>
-          <Link href={`/learning-logs/new?courseId=${params.id}`}>
-            <Button size="sm">학습일지 작성</Button>
-          </Link>
         </div>
         {learningLogs.length === 0 ? (
           <div className="text-center py-8 text-gray-500 border rounded-lg">
