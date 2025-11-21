@@ -127,7 +127,7 @@ export async function updatePaymentsForFirstClassDate(
         .gte('payment_date', firstMonthStartStr)
         .lte('payment_date', firstMonthEnd.toISOString().split('T')[0]);
 
-      // 비례 계산된 금액 계산
+      // 첫달 결제 금액 계산: 첫달 남은일수 + 다음달 전액
       const proportionalAmount = calculateProportionalTuition(
         course.tuition_fee,
         newFirstDate,
@@ -135,7 +135,10 @@ export async function updatePaymentsForFirstClassDate(
         firstMonth
       );
 
-      if (proportionalAmount > 0) {
+      // 첫달 남은일수 + 다음달 전액
+      const firstPaymentAmount = proportionalAmount + course.tuition_fee;
+
+      if (firstPaymentAmount > 0) {
         const paymentDate = new Date(firstYear, firstMonth - 1, dueDay);
         const paymentDateStr = paymentDate.toISOString().split('T')[0];
 
@@ -146,7 +149,7 @@ export async function updatePaymentsForFirstClassDate(
             .insert([{
               student_id: studentId,
               course_id: courseId,
-              amount: proportionalAmount,
+              amount: firstPaymentAmount, // 첫달 남은일수 + 다음달 전액
               payment_method: 'card',
               payment_date: paymentDateStr,
               status: 'pending',
@@ -161,7 +164,7 @@ export async function updatePaymentsForFirstClassDate(
           const { error: updateError } = await supabase
             .from('payments')
             .update({ 
-              amount: proportionalAmount,
+              amount: firstPaymentAmount, // 첫달 남은일수 + 다음달 전액
               payment_date: paymentDateStr
             })
             .eq('id', existingPayments[0].id);
@@ -180,7 +183,47 @@ export async function updatePaymentsForFirstClassDate(
         }
       }
 
-      // 첫 수업일 이후의 모든 결제 항목 재생성
+      // 학생 정보 조회 (마지막 수업일 확인)
+      const { data: fullStudentData } = await supabase
+        .from('students')
+        .select('last_class_date, status')
+        .eq('id', studentId)
+        .single();
+
+      const lastClassDate = fullStudentData?.last_class_date;
+      const studentStatus = fullStudentData?.status;
+
+      // 그만둔 학생의 경우 마지막 수업일 이후의 결제 항목 삭제
+      if (studentStatus === 'inactive' && lastClassDate) {
+        const lastDate = new Date(lastClassDate);
+        lastDate.setHours(0, 0, 0, 0);
+        const lastDateStr = lastDate.toISOString().split('T')[0];
+
+        // 마지막 수업일 이후의 모든 결제 항목 삭제
+        await supabase
+          .from('payments')
+          .delete()
+          .eq('student_id', studentId)
+          .eq('course_id', courseId)
+          .eq('type', 'payment')
+          .gt('payment_date', lastDateStr);
+      } else {
+      // 첫달 다음 달 결제 항목 삭제 (첫달에 합쳐졌으므로)
+      const nextMonth = firstMonth === 12 ? 1 : firstMonth + 1;
+      const nextYear = firstMonth === 12 ? firstYear + 1 : firstYear;
+      const nextMonthStart = new Date(nextYear, nextMonth - 1, 1);
+      const nextMonthEnd = new Date(nextYear, nextMonth, 0);
+      
+      await supabase
+        .from('payments')
+        .delete()
+        .eq('student_id', studentId)
+        .eq('course_id', courseId)
+        .eq('type', 'payment')
+        .gte('payment_date', nextMonthStart.toISOString().split('T')[0])
+        .lte('payment_date', nextMonthEnd.toISOString().split('T')[0]);
+
+      // 첫 수업일 이후의 모든 결제 항목 재생성 (첫달 다음 달 다음 달부터)
       // 현재 날짜부터 12개월 후까지의 결제 항목 생성
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -188,7 +231,7 @@ export async function updatePaymentsForFirstClassDate(
       endDate.setMonth(endDate.getMonth() + 12);
 
       let currentDate = new Date(firstMonthStart);
-      currentDate.setMonth(currentDate.getMonth() + 1); // 첫 달 다음 달부터 시작
+      currentDate.setMonth(currentDate.getMonth() + 2); // 첫 달 다음 달 다음 달부터 시작
 
       while (currentDate <= endDate) {
         const year = currentDate.getFullYear();
@@ -261,6 +304,25 @@ export async function updateRefundsForLastClassDate(
 
     if (deleteError) {
       console.error('기존 환불 항목 삭제 오류:', deleteError);
+    }
+
+    // 마지막 수업일 이후의 선납 수강료 삭제
+    if (newLastClassDate) {
+      const lastDate = new Date(newLastClassDate);
+      lastDate.setHours(0, 0, 0, 0);
+      const lastDateStr = lastDate.toISOString().split('T')[0];
+
+      // 마지막 수업일 이후의 모든 결제 항목 삭제
+      const { error: deletePaymentsError } = await supabase
+        .from('payments')
+        .delete()
+        .eq('student_id', studentId)
+        .eq('type', 'payment')
+        .gt('payment_date', lastDateStr);
+
+      if (deletePaymentsError) {
+        console.error('선납 수강료 삭제 오류:', deletePaymentsError);
+      }
     }
 
     // 새로운 마지막 수업일이 있으면 환불 생성
