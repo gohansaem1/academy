@@ -346,6 +346,7 @@ export default function PaymentsPage() {
 
       setPayments(allPayments);
       setSelectedPayments(new Set()); // 월 변경 시 선택 초기화
+      setSelectedRefunds(new Set()); // 월 변경 시 환불 선택 초기화
     } catch (error) {
       console.error('결제 이력 조회 오류:', error);
       alert('결제 이력을 불러오는 중 오류가 발생했습니다.');
