@@ -1,17 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { StudentFormData } from '@/types/student';
+import { Course } from '@/types/course';
 import { useAuth } from '@/hooks/useAuth';
 import Button from '@/components/common/Button';
 import Input from '@/components/common/Input';
+import { calculateProportionalTuition } from '@/lib/utils/tuition';
 
 export default function NewStudentPage() {
   const { user, loading: authLoading } = useAuth('ADMIN');
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
+  const [loadingCourses, setLoadingCourses] = useState(true);
+  const [courseEnrollments, setCourseEnrollments] = useState<Record<string, number>>({}); // 수업별 등록 학생 수
   const [formData, setFormData] = useState<StudentFormData>({
     name: '',
     phone: '',
@@ -24,6 +30,56 @@ export default function NewStudentPage() {
     first_class_date: new Date().toISOString().split('T')[0], // 기본값: 오늘
   });
   const [errors, setErrors] = useState<Partial<Record<keyof StudentFormData, string>>>({});
+
+  useEffect(() => {
+    if (!authLoading) {
+      fetchCourses();
+    }
+  }, [authLoading]);
+
+  const fetchCourses = async () => {
+    try {
+      setLoadingCourses(true);
+      const { data, error } = await supabase
+        .from('courses')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      setCourses(data || []);
+
+      // 각 수업별 등록된 학생 수 조회 (재학생만)
+      const enrollments: Record<string, number> = {};
+      for (const course of data || []) {
+        try {
+          // 재학생만 카운트
+          const { data: enrollmentData, error: enrollmentError } = await supabase
+            .from('course_enrollments')
+            .select('students!inner(status)')
+            .eq('course_id', course.id);
+          
+          if (!enrollmentError && enrollmentData) {
+            const activeCount = enrollmentData.filter((item: any) => 
+              item.students && (item.students.status === 'active' || !item.students.status)
+            ).length;
+            
+            enrollments[course.id] = activeCount;
+          } else {
+            enrollments[course.id] = 0;
+          }
+        } catch (err) {
+          console.error(`수업 ${course.id} 등록 학생 수 조회 오류:`, err);
+          enrollments[course.id] = 0;
+        }
+      }
+      setCourseEnrollments(enrollments);
+    } catch (error) {
+      console.error('수업 목록 조회 오류:', error);
+      alert('수업 목록을 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      setLoadingCourses(false);
+    }
+  };
 
   if (authLoading) {
     return (
@@ -58,6 +114,9 @@ export default function NewStudentPage() {
     if (formData.payment_due_day !== undefined && (formData.payment_due_day < 1 || formData.payment_due_day > 31)) {
       newErrors.payment_due_day = '결제일은 1일부터 31일 사이여야 합니다.';
     }
+    if (selectedCourses.length === 0) {
+      newErrors.first_class_date = '최소 하나의 수업을 선택해주세요.';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -70,7 +129,9 @@ export default function NewStudentPage() {
 
     try {
       setSaving(true);
-      const { error } = await supabase
+
+      // 학생 등록
+      const { data: studentData, error: studentError } = await supabase
         .from('students')
         .insert([{
           name: formData.name,
@@ -82,11 +143,98 @@ export default function NewStudentPage() {
           payment_due_day: formData.payment_due_day || null,
           status: formData.status || 'active',
           first_class_date: formData.first_class_date || null,
-        }]);
+        }])
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (studentError) throw studentError;
 
-      alert('학생이 등록되었습니다.');
+      const studentId = studentData.id;
+      const firstClassDate = formData.first_class_date 
+        ? new Date(formData.first_class_date) 
+        : new Date();
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      const currentMonth = today.getMonth() + 1;
+      const dueDay = formData.payment_due_day || 25;
+
+      // 선택한 수업에 등록 및 결제 항목 생성
+      for (const courseId of selectedCourses) {
+        const course = courses.find(c => c.id === courseId);
+        if (!course) continue;
+
+        // 정원 체크 (재학생만 카운트)
+        const { data: enrollmentData, error: checkError } = await supabase
+          .from('course_enrollments')
+          .select('students!inner(status)')
+          .eq('course_id', courseId);
+        
+        if (!checkError && enrollmentData) {
+          const activeCount = enrollmentData.filter((item: any) => 
+            item.students && (item.students.status === 'active' || !item.students.status)
+          ).length;
+          
+          if (activeCount >= course.capacity) {
+            alert(`${course.name} 수업의 정원이 초과되었습니다. (${activeCount}/${course.capacity}명)`);
+            continue; // 다음 수업으로 넘어감
+          }
+        }
+
+        // 수업 등록
+        const { error: enrollError } = await supabase
+          .from('course_enrollments')
+          .insert([{
+            course_id: courseId,
+            student_id: studentId,
+          }]);
+
+        if (enrollError && enrollError.code !== '23505') {
+          console.error('수업 등록 오류:', enrollError);
+          continue;
+        }
+
+        // 결제일 계산
+        let paymentDate = new Date(currentYear, currentMonth - 1, dueDay);
+        if (paymentDate < today) {
+          paymentDate.setMonth(paymentDate.getMonth() + 1);
+        }
+
+        // 첫달 결제 금액 계산: 첫달 남은일수 + 다음달 전액
+        let firstPaymentAmount = course.tuition_fee * 2; // 기본값: 전액 * 2
+        
+        if (firstClassDate) {
+          const firstMonthAmount = calculateProportionalTuition(
+            course.tuition_fee,
+            firstClassDate,
+            currentYear,
+            currentMonth
+          );
+          
+          // 첫달 남은일수 + 다음달 전액
+          firstPaymentAmount = firstMonthAmount + course.tuition_fee;
+        }
+
+        // 첫달 결제 항목 생성 (첫달 남은일수 + 다음달 전액)
+        if (firstPaymentAmount > 0) {
+          const { error: paymentError } = await supabase
+            .from('payments')
+            .insert([{
+              student_id: studentId,
+              course_id: courseId,
+              amount: firstPaymentAmount,
+              payment_method: 'card', // 기본값: 카드
+              payment_date: paymentDate.toISOString().split('T')[0],
+              status: 'pending', // 기본값: 미납
+              type: 'payment', // 수강료
+            }]);
+
+          if (paymentError) {
+            console.error('결제 항목 생성 오류:', paymentError);
+          }
+        }
+      }
+
+      alert('학생이 등록되었습니다. 선택한 수업에 자동으로 등록되었고 결제 항목이 생성되었습니다.');
       router.push('/students');
     } catch (error: any) {
       console.error('학생 등록 오류:', error);
@@ -198,6 +346,79 @@ export default function NewStudentPage() {
             <option value="inactive">그만둔</option>
           </select>
           <p className="mt-1 text-sm text-gray-500">학생의 현재 상태를 선택하세요</p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-2 text-gray-700">
+            수업 선택 <span className="text-red-500">*</span>
+          </label>
+          {loadingCourses ? (
+            <p className="text-sm text-gray-500">수업 목록을 불러오는 중...</p>
+          ) : courses.length === 0 ? (
+            <p className="text-sm text-red-500">등록된 수업이 없습니다. 먼저 수업을 등록해주세요.</p>
+          ) : (
+            <div 
+              className="space-y-2 border border-gray-300 rounded-md p-4 max-h-60 overflow-y-auto overscroll-contain"
+              tabIndex={0}
+              style={{ 
+                scrollBehavior: 'smooth',
+                scrollbarWidth: 'thin',
+                scrollbarColor: '#cbd5e0 #f7fafc'
+              }}
+            >
+              {courses.map((course) => {
+                const enrolledCount = courseEnrollments[course.id] || 0;
+                const isFull = enrolledCount >= course.capacity;
+                const isSelected = selectedCourses.includes(course.id);
+                
+                return (
+                  <label 
+                    key={course.id} 
+                    className={`flex items-center space-x-2 p-2 rounded ${
+                      isFull && !isSelected 
+                        ? 'cursor-not-allowed opacity-50 bg-gray-100' 
+                        : 'cursor-pointer hover:bg-gray-50'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      disabled={isFull && !isSelected}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          // 정원 체크
+                          if (isFull) {
+                            alert(`${course.name} 수업의 정원이 초과되었습니다. (${enrolledCount}/${course.capacity}명)`);
+                            return;
+                          }
+                          setSelectedCourses([...selectedCourses, course.id]);
+                        } else {
+                          setSelectedCourses(selectedCourses.filter(id => id !== course.id));
+                        }
+                      }}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:cursor-not-allowed"
+                    />
+                    <span className="flex-1">
+                      <span className={`font-medium ${isFull && !isSelected ? 'text-gray-400' : ''}`}>
+                        {course.name}
+                      </span>
+                      <span className={`text-sm ml-2 ${isFull && !isSelected ? 'text-gray-400' : 'text-gray-500'}`}>
+                        ({course.subject} · {course.tuition_fee.toLocaleString()}원)
+                      </span>
+                      <span className={`text-xs ml-2 ${isFull ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>
+                        ({enrolledCount}/{course.capacity}명)
+                        {isFull && !isSelected && ' [정원 초과]'}
+                      </span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+          {selectedCourses.length === 0 && !loadingCourses && (
+            <p className="mt-1 text-sm text-red-500">최소 하나의 수업을 선택해주세요.</p>
+          )}
+          <p className="mt-1 text-sm text-gray-500">학생이 수강할 수업을 선택하세요 (다중 선택 가능)</p>
         </div>
 
         <div className="flex gap-2 pt-4">

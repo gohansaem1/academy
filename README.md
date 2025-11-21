@@ -101,6 +101,31 @@ npm start
 - 결제 이력 조회
 - 미납 관리
 
+## 👤 관리자 계정
+
+### 초기 로그인 정보
+- **이메일**: `admin@academy.local`
+- **비밀번호**: `0000`
+
+⚠️ **보안 경고**: 초기 비밀번호는 보안상 매우 위험하므로, 첫 로그인 후 반드시 비밀번호를 변경하세요.
+
+### 비밀번호 재설정
+
+비밀번호를 잊어버린 경우, 다음 방법으로 재설정할 수 있습니다:
+
+1. **Supabase Dashboard를 통한 재설정** (권장)
+   - Supabase Dashboard > Authentication > Users
+   - 관리자 계정 선택 > Update User > Password 변경
+
+2. **자세한 가이드**: [`supabase/RESET_ADMIN_PASSWORD.md`](./supabase/RESET_ADMIN_PASSWORD.md) 참조
+
+### 비밀번호 확인 불가 안내
+
+Supabase Auth는 보안을 위해 비밀번호를 암호화하여 저장합니다. 따라서:
+- 비밀번호를 평문으로 확인할 수 없습니다
+- 로그아웃 후 비밀번호를 확인할 수 없습니다 (보안상 정상 동작)
+- 비밀번호 재설정만 가능합니다
+
 ## 📖 문서
 
 자세한 개발 문서는 `docs/` 디렉토리를 참고하세요:
@@ -110,6 +135,7 @@ npm start
 - [API 명세서](./docs/API.md)
 - [데이터베이스 설계](./docs/DATABASE.md)
 - [배포 가이드](./docs/DEPLOYMENT.md)
+- [관리자 비밀번호 재설정 가이드](./supabase/RESET_ADMIN_PASSWORD.md)
 
 ## 🤝 기여하기
 

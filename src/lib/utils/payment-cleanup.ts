@@ -208,75 +208,75 @@ export async function updatePaymentsForFirstClassDate(
           .eq('type', 'payment')
           .gt('payment_date', lastDateStr);
       } else {
-      // 첫달 다음 달 결제 항목 삭제 (첫달에 합쳐졌으므로)
-      const nextMonth = firstMonth === 12 ? 1 : firstMonth + 1;
-      const nextYear = firstMonth === 12 ? firstYear + 1 : firstYear;
-      const nextMonthStart = new Date(nextYear, nextMonth - 1, 1);
-      const nextMonthEnd = new Date(nextYear, nextMonth, 0);
-      
-      await supabase
-        .from('payments')
-        .delete()
-        .eq('student_id', studentId)
-        .eq('course_id', courseId)
-        .eq('type', 'payment')
-        .gte('payment_date', nextMonthStart.toISOString().split('T')[0])
-        .lte('payment_date', nextMonthEnd.toISOString().split('T')[0]);
-
-      // 첫 수업일 이후의 모든 결제 항목 재생성 (첫달 다음 달 다음 달부터)
-      // 현재 날짜부터 12개월 후까지의 결제 항목 생성
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const endDate = new Date(today);
-      endDate.setMonth(endDate.getMonth() + 12);
-
-      let currentDate = new Date(firstMonthStart);
-      currentDate.setMonth(currentDate.getMonth() + 2); // 첫 달 다음 달 다음 달부터 시작
-
-      while (currentDate <= endDate) {
-        const year = currentDate.getFullYear();
-        const month = currentDate.getMonth() + 1;
-        const monthStart = new Date(year, month - 1, 1);
-        const monthEnd = new Date(year, month, 0);
-        const monthStartStr = monthStart.toISOString().split('T')[0];
-        const monthEndStr = monthEnd.toISOString().split('T')[0];
-
-        // 해당 달의 결제 항목 조회
-        const { data: monthPayments } = await supabase
+        // 첫달 다음 달 결제 항목 삭제 (첫달에 합쳐졌으므로)
+        const nextMonth = firstMonth === 12 ? 1 : firstMonth + 1;
+        const nextYear = firstMonth === 12 ? firstYear + 1 : firstYear;
+        const nextMonthStart = new Date(nextYear, nextMonth - 1, 1);
+        const nextMonthEnd = new Date(nextYear, nextMonth, 0);
+        
+        await supabase
           .from('payments')
-          .select('*')
+          .delete()
           .eq('student_id', studentId)
           .eq('course_id', courseId)
           .eq('type', 'payment')
-          .gte('payment_date', monthStartStr)
-          .lte('payment_date', monthEndStr);
+          .gte('payment_date', nextMonthStart.toISOString().split('T')[0])
+          .lte('payment_date', nextMonthEnd.toISOString().split('T')[0]);
 
-        if (!monthPayments || monthPayments.length === 0) {
-          // 결제 항목이 없으면 생성
-          const paymentDate = new Date(year, month - 1, dueDay);
-          const paymentDateStr = paymentDate.toISOString().split('T')[0];
+        // 첫 수업일 이후의 모든 결제 항목 재생성 (첫달 다음 달 다음 달부터)
+        // 현재 날짜부터 12개월 후까지의 결제 항목 생성
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const endDate = new Date(today);
+        endDate.setMonth(endDate.getMonth() + 12);
 
-          const { error: insertError } = await supabase
+        let currentDate = new Date(firstMonthStart);
+        currentDate.setMonth(currentDate.getMonth() + 2); // 첫 달 다음 달 다음 달부터 시작
+
+        while (currentDate <= endDate) {
+          const year = currentDate.getFullYear();
+          const month = currentDate.getMonth() + 1;
+          const monthStart = new Date(year, month - 1, 1);
+          const monthEnd = new Date(year, month, 0);
+          const monthStartStr = monthStart.toISOString().split('T')[0];
+          const monthEndStr = monthEnd.toISOString().split('T')[0];
+
+          // 해당 달의 결제 항목 조회
+          const { data: monthPayments } = await supabase
             .from('payments')
-            .insert([{
-              student_id: studentId,
-              course_id: courseId,
-              amount: course.tuition_fee, // 첫 달 이후는 전액
-              payment_method: 'card',
-              payment_date: paymentDateStr,
-              status: 'pending',
-              type: 'payment',
-            }]);
+            .select('*')
+            .eq('student_id', studentId)
+            .eq('course_id', courseId)
+            .eq('type', 'payment')
+            .gte('payment_date', monthStartStr)
+            .lte('payment_date', monthEndStr);
 
-          if (insertError) {
-            console.error(`${year}년 ${month}월 결제 항목 생성 오류:`, insertError);
+          if (!monthPayments || monthPayments.length === 0) {
+            // 결제 항목이 없으면 생성
+            const paymentDate = new Date(year, month - 1, dueDay);
+            const paymentDateStr = paymentDate.toISOString().split('T')[0];
+
+            const { error: insertError } = await supabase
+              .from('payments')
+              .insert([{
+                student_id: studentId,
+                course_id: courseId,
+                amount: course.tuition_fee, // 첫 달 이후는 전액
+                payment_method: 'card',
+                payment_date: paymentDateStr,
+                status: 'pending',
+                type: 'payment',
+              }]);
+
+            if (insertError) {
+              console.error(`${year}년 ${month}월 결제 항목 생성 오류:`, insertError);
+            }
           }
-        }
 
-        // 다음 달로 이동
-        currentDate.setMonth(currentDate.getMonth() + 1);
+          // 다음 달로 이동
+          currentDate.setMonth(currentDate.getMonth() + 1);
+        }
       }
-    }
   } catch (error) {
     console.error('첫 수업일 변경 시 결제 항목 업데이트 오류:', error);
   }
@@ -367,19 +367,53 @@ export async function updateRefundsForLastClassDate(
       const lastYear = lastDate.getFullYear();
       const lastMonth = lastDate.getMonth() + 1;
 
+      // 학생 정보에서 첫 수업일 확인
+      const { data: fullStudentData } = await supabase
+        .from('students')
+        .select('first_class_date')
+        .eq('id', studentId)
+        .single();
+
+      const firstClassDate = fullStudentData?.first_class_date 
+        ? new Date(fullStudentData.first_class_date)
+        : null;
+      const firstYear = firstClassDate ? firstClassDate.getFullYear() : null;
+      const firstMonth = firstClassDate ? firstClassDate.getMonth() + 1 : null;
+
       // 각 수업에 대해 환불 계산 및 생성
       for (const enrollment of enrollments) {
         const course = (enrollment as any).courses;
         if (!course || !course.tuition_fee) continue;
 
-        // 마지막 수업일이 속한 달의 환불 금액 계산
-        const { calculateRefundAmount } = await import('./tuition');
-        const refundAmount = calculateRefundAmount(
-          course.tuition_fee,
-          lastDate,
-          lastYear,
-          lastMonth
-        );
+        let refundAmount = 0;
+
+        // 첫 달과 마지막 달이 같은 경우
+        if (firstClassDate && firstYear === lastYear && firstMonth === lastMonth) {
+          // 첫 달 미수업 부분 환불
+          const { calculateRefundAmount } = await import('./tuition');
+          const firstMonthRefund = calculateRefundAmount(
+            course.tuition_fee,
+            lastDate,
+            lastYear,
+            lastMonth
+          );
+          
+          // 다음 달 전액 환불 (첫 달 결제에 포함되어 있었음)
+          const nextMonth = lastMonth === 12 ? 1 : lastMonth + 1;
+          const nextYear = lastMonth === 12 ? lastYear + 1 : lastYear;
+          const nextMonthRefund = course.tuition_fee;
+          
+          refundAmount = firstMonthRefund + nextMonthRefund;
+        } else {
+          // 일반적인 경우: 마지막 수업일이 속한 달의 환불 금액만 계산
+          const { calculateRefundAmount } = await import('./tuition');
+          refundAmount = calculateRefundAmount(
+            course.tuition_fee,
+            lastDate,
+            lastYear,
+            lastMonth
+          );
+        }
 
         if (refundAmount <= 0) {
           console.log(`환불 금액이 0이므로 스킵 (수업: ${course.name})`);

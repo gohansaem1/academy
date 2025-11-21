@@ -3,9 +3,19 @@ import { User } from '@/types/user';
 
 export async function getCurrentUser(): Promise<User | null> {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
-    if (!user) return null;
+    if (authError) {
+      console.error('Auth 세션 확인 오류:', authError);
+      return null;
+    }
+    
+    if (!user) {
+      console.log('Auth 세션이 없습니다.');
+      return null;
+    }
+
+    console.log('Auth 세션 확인:', { userId: user.id, email: user.email });
 
     const { data, error } = await supabase
       .from('users')
@@ -15,9 +25,22 @@ export async function getCurrentUser(): Promise<User | null> {
 
     if (error) {
       console.error('사용자 정보 조회 오류:', error);
+      // 이메일로 재시도
+      const { data: userDataByEmail } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', user.email)
+        .single();
+      
+      if (userDataByEmail) {
+        console.log('이메일로 사용자 정보 조회 성공:', userDataByEmail);
+        return userDataByEmail;
+      }
+      
       return null;
     }
 
+    console.log('사용자 정보 조회 성공:', data);
     return data;
   } catch (error) {
     console.error('사용자 인증 확인 오류:', error);

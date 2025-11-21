@@ -42,29 +42,55 @@ export async function createRefundForInactiveStudent(
     const lastYear = lastDate.getFullYear();
     const lastMonth = lastDate.getMonth() + 1;
 
+    // 학생 정보 조회 (first_class_date 확인 필요)
+    const { data: studentInfo } = await supabase
+      .from('students')
+      .select('first_class_date, payment_due_day')
+      .eq('id', studentId)
+      .single();
+
+    const firstClassDate = studentInfo?.first_class_date 
+      ? new Date(studentInfo.first_class_date)
+      : null;
+    const firstYear = firstClassDate ? firstClassDate.getFullYear() : null;
+    const firstMonth = firstClassDate ? firstClassDate.getMonth() + 1 : null;
+
     // 각 수업에 대해 환불 계산 및 생성
     for (const enrollment of enrollments) {
       const course = (enrollment as any).courses;
       if (!course || !course.tuition_fee) continue;
 
-      // 마지막 수업일이 속한 달의 환불 금액 계산
-      const refundAmount = calculateRefundAmount(
-        course.tuition_fee,
-        lastDate,
-        lastYear,
-        lastMonth
-      );
+      let refundAmount = 0;
+
+      // 첫 달과 마지막 달이 같은 경우
+      if (firstClassDate && firstYear === lastYear && firstMonth === lastMonth) {
+        // 첫 달 미수업 부분 환불
+        const firstMonthRefund = calculateRefundAmount(
+          course.tuition_fee,
+          lastDate,
+          lastYear,
+          lastMonth
+        );
+        
+        // 다음 달 전액 환불 (첫 달 결제에 포함되어 있었음)
+        const nextMonth = lastMonth === 12 ? 1 : lastMonth + 1;
+        const nextYear = lastMonth === 12 ? lastYear + 1 : lastYear;
+        const nextMonthRefund = course.tuition_fee;
+        
+        refundAmount = firstMonthRefund + nextMonthRefund;
+      } else {
+        // 일반적인 경우: 마지막 수업일이 속한 달의 환불 금액만 계산
+        refundAmount = calculateRefundAmount(
+          course.tuition_fee,
+          lastDate,
+          lastYear,
+          lastMonth
+        );
+      }
 
       if (refundAmount <= 0) continue; // 환불 금액이 없으면 스킵
 
-      // 학생 정보 조회 (payment_due_day 필요)
-      const { data: studentData } = await supabase
-        .from('students')
-        .select('payment_due_day')
-        .eq('id', studentId)
-        .single();
-
-      const dueDay = studentData?.payment_due_day || 25;
+      const dueDay = studentInfo?.payment_due_day || 25;
 
       // 환불일 계산 (마지막 수업일이 속한 달의 결제일)
       const refundDate = new Date(lastYear, lastMonth - 1, dueDay);

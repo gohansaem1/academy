@@ -16,8 +16,11 @@ export default function EnrollStudentPage() {
   const [enrolledStudents, setEnrolledStudents] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [course, setCourse] = useState<any>(null);
+  const [enrolledCount, setEnrolledCount] = useState(0);
 
   useEffect(() => {
+    fetchCourse();
     fetchStudents();
     fetchEnrolledStudents();
   }, [params.id]);
@@ -41,15 +44,37 @@ export default function EnrollStudentPage() {
     }
   };
 
-  const fetchEnrolledStudents = async () => {
+  const fetchCourse = async () => {
     try {
       const { data, error } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('id', params.id)
+        .single();
+
+      if (error) throw error;
+      setCourse(data);
+    } catch (error) {
+      console.error('수업 정보 조회 오류:', error);
+    }
+  };
+
+  const fetchEnrolledStudents = async () => {
+    try {
+      // 재학생만 카운트
+      const { data, error } = await supabase
         .from('course_enrollments')
-        .select('student_id')
+        .select('student_id, students!inner(status)')
         .eq('course_id', params.id);
 
       if (error) throw error;
-      setEnrolledStudents((data || []).map((e: any) => e.student_id));
+      
+      const activeEnrollments = (data || []).filter((item: any) => 
+        item.students && (item.students.status === 'active' || !item.students.status)
+      );
+      
+      setEnrolledStudents(activeEnrollments.map((e: any) => e.student_id));
+      setEnrolledCount(activeEnrollments.length);
     } catch (error) {
       console.error('등록 학생 조회 오류:', error);
     }
@@ -57,6 +82,12 @@ export default function EnrollStudentPage() {
 
   const handleEnroll = async (studentId: string) => {
     try {
+      // 정원 체크
+      if (course && enrolledCount >= course.capacity) {
+        alert(`수업 정원이 초과되었습니다. (${enrolledCount}/${course.capacity}명)`);
+        return;
+      }
+
       // 수업 정보 조회 (스케줄 포함)
       const { data: courseData, error: courseError } = await supabase
         .from('courses')
@@ -146,6 +177,7 @@ export default function EnrollStudentPage() {
       }
 
       setEnrolledStudents([...enrolledStudents, studentId]);
+      setEnrolledCount(enrolledCount + 1);
       alert('학생이 등록되었습니다. 결제 항목이 자동으로 생성되었습니다.');
     } catch (error: any) {
       console.error('학생 등록 오류:', error);

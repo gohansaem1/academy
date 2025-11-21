@@ -73,15 +73,98 @@ function SettingsContent() {
 
       // 초기 비밀번호 변경인 경우 (비밀번호가 0000인 경우)
       if (isInitial) {
+        // 임시 저장된 사용자 정보 확인
+        const tempUserStr = localStorage.getItem('temp_user');
+        let userData = null;
+        
+        if (tempUserStr) {
+          try {
+            userData = JSON.parse(tempUserStr);
+          } catch (err) {
+            console.error('임시 사용자 정보 파싱 오류:', err);
+          }
+        }
+        
+        // 사용자 정보가 없으면 이메일로 조회
+        if (!userData && formData.email) {
+          const { data: fetchedUserData } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', formData.email)
+            .single();
+          
+          if (fetchedUserData) {
+            userData = fetchedUserData;
+          }
+        }
+        
+        if (!userData) {
+          setError('사용자 정보를 찾을 수 없습니다. 다시 로그인해주세요.');
+          return;
+        }
+        
+        // 현재 세션 확인
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        
+        // 세션이 없으면 강제로 로그인 시도 (에러 무시)
+        if (!currentUser) {
+          // 로그인 시도 (에러는 무시하고 진행)
+          await supabase.auth.signInWithPassword({
+            email: formData.email,
+            password: '0000',
+          }).catch(() => {
+            // 에러 무시 - 크롬 경고가 나와도 계속 진행
+          });
+        }
+        
+        // 비밀번호 변경 시도
         const { error: updateError } = await supabase.auth.updateUser({
           password: formData.newPassword,
         });
 
-        if (updateError) throw updateError;
+        if (updateError) {
+          // 업데이트 실패 시, 다시 로그인 시도 후 재시도
+          await supabase.auth.signInWithPassword({
+            email: formData.email,
+            password: '0000',
+          }).catch(() => {
+            // 에러 무시
+          });
+          
+          // 다시 비밀번호 변경 시도
+          const { error: retryError } = await supabase.auth.updateUser({
+            password: formData.newPassword,
+          });
+          
+          if (retryError) {
+            setError('비밀번호 변경에 실패했습니다. Supabase Dashboard에서 직접 변경해주세요.');
+            return;
+          }
+        }
+
+        // 사용자 정보 다시 조회하여 세션 업데이트
+        const { data: { user: updatedUser } } = await supabase.auth.getUser();
+        if (updatedUser) {
+          const { data: refreshedUserData } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', updatedUser.id)
+            .single();
+          
+          if (refreshedUserData) {
+            localStorage.setItem('user', JSON.stringify(refreshedUserData));
+          }
+        } else {
+          // 세션이 없어도 사용자 정보 저장
+          localStorage.setItem('user', JSON.stringify(userData));
+        }
+        
+        // 임시 사용자 정보 삭제
+        localStorage.removeItem('temp_user');
 
         setSuccess(true);
         setTimeout(() => {
-          router.push('/');
+          window.location.href = '/';
         }, 2000);
         return;
       }

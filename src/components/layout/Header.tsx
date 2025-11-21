@@ -11,7 +11,37 @@ export default function Header() {
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    setUser(getUserFromStorage());
+    // 초기 사용자 정보 로드
+    const loadUser = () => {
+      const currentUser = getUserFromStorage();
+      setUser(currentUser);
+    };
+
+    loadUser();
+
+    // localStorage 변경 감지 (다른 탭에서 로그인/로그아웃 시)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'user') {
+        loadUser();
+      }
+    };
+
+    // 페이지 포커스 시 사용자 정보 다시 확인 (같은 탭에서 로그인 시)
+    const handleFocus = () => {
+      loadUser();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('focus', handleFocus);
+
+    // 주기적으로 사용자 정보 확인 (로그인 후 즉시 반영)
+    const intervalId = setInterval(loadUser, 1000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(intervalId);
+    };
   }, []);
 
   const handleSignOut = async () => {
