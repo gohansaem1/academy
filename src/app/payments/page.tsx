@@ -45,6 +45,10 @@ interface PaymentWithStudent extends Payment {
 }
 
 type PaymentFilter = 'all' | 'overdue' | 'confirmed' | 'first_month' | 'refund';
+type StatusFilter = {
+  pending: boolean;
+  confirmed: boolean;
+};
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<PaymentWithStudent[]>([]);
@@ -57,10 +61,10 @@ export default function PaymentsPage() {
   const [selectedPayments, setSelectedPayments] = useState<Set<string>>(new Set());
   const [editingPayments, setEditingPayments] = useState<Record<string, { payment_method?: string; payment_date?: string; status?: string }>>({});
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>({ pending: false, confirmed: false });
   const [showAllPeriod, setShowAllPeriod] = useState(false);
   const [expectedRevenue, setExpectedRevenue] = useState<number | null>(null);
   const [loadingExpectedRevenue, setLoadingExpectedRevenue] = useState(false);
-  const [expandedPayments, setExpandedPayments] = useState<Set<string>>(new Set());
   const [refundRows, setRefundRows] = useState<Array<{
     id: string;
     student_id: string;
@@ -568,7 +572,25 @@ export default function PaymentsPage() {
       
       if (!matchesSearch) return false;
 
-      // 상태 필터
+      // 상태 필터 (체크박스)
+      if (statusFilter.pending || statusFilter.confirmed) {
+        const isPending = payment.status === 'pending' || 
+                         (payment.status !== 'completed' && payment.status !== 'confirmed' && payment.status !== 'cancelled');
+        const isConfirmed = payment.status === 'confirmed' || payment.status === 'completed';
+        
+        if (statusFilter.pending && statusFilter.confirmed) {
+          // 둘 다 선택: 미납 또는 완료
+          if (!isPending && !isConfirmed) return false;
+        } else if (statusFilter.pending) {
+          // 미납만 선택
+          if (!isPending) return false;
+        } else if (statusFilter.confirmed) {
+          // 완료만 선택
+          if (!isConfirmed) return false;
+        }
+      }
+
+      // 필터 선택
       switch (paymentFilter) {
         case 'overdue':
           // 미납: pending 상태이거나 결제일이 지났지만 아직 완료되지 않은 경우
@@ -934,6 +956,31 @@ export default function PaymentsPage() {
               <option value="refund">환불 금액</option>
             </select>
           </div>
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-700">
+              상태 필터
+            </label>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={statusFilter.pending}
+                  onChange={(e) => setStatusFilter({ ...statusFilter, pending: e.target.checked })}
+                  className="w-4 h-4"
+                />
+                <span className="text-sm text-gray-700">미납</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={statusFilter.confirmed}
+                  onChange={(e) => setStatusFilter({ ...statusFilter, confirmed: e.target.checked })}
+                  className="w-4 h-4"
+                />
+                <span className="text-sm text-gray-700">완료</span>
+              </label>
+            </div>
+          </div>
           <Input
             placeholder="학생명 또는 수업명으로 검색..."
             value={searchTerm}
@@ -948,6 +995,28 @@ export default function PaymentsPage() {
               onClick={handleBulkConfirm}
             >
               선택한 {selectedPayments.size}개 확인
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                if (!confirm(`선택한 ${selectedPayments.size}개의 결제를 미납으로 변경하시겠습니까?`)) return;
+                try {
+                  const { error } = await supabase
+                    .from('payments')
+                    .update({ status: 'pending' })
+                    .in('id', Array.from(selectedPayments));
+                  if (error) throw error;
+                  fetchPayments();
+                  setSelectedPayments(new Set());
+                  alert('선택한 결제가 미납으로 변경되었습니다.');
+                } catch (error) {
+                  console.error('일괄 미납 변경 오류:', error);
+                  alert('결제 상태 변경 중 오류가 발생했습니다.');
+                }
+              }}
+            >
+              선택한 {selectedPayments.size}개 미납으로 변경
             </Button>
             <Button
               variant="outline"
@@ -979,7 +1048,6 @@ export default function PaymentsPage() {
                     className="w-4 h-4"
                   />
                 </TableHead>
-                <TableHead className="w-12"></TableHead>
                 <TableHead>학생명</TableHead>
                 <TableHead>수업명</TableHead>
                 <TableHead>결제 금액</TableHead>
@@ -1129,8 +1197,6 @@ export default function PaymentsPage() {
                   ? STATUS_COLORS[payment.status as keyof typeof STATUS_COLORS]
                   : getDueStatusColor(dueStatus, payment.status);
 
-                const isExpanded = expandedPayments.has(payment.id);
-                
                 // 결제일 기준으로 연도와 월 추출
                 const paymentDate = new Date(payment.payment_date);
                 const paymentYear = paymentDate.getFullYear();
@@ -1151,51 +1217,28 @@ export default function PaymentsPage() {
                          lastClassDate.getMonth() + 1 === paymentMonth;
                 })();
                 
-                // 첫 달 계산 정보
-                let firstMonthCalculation = null;
+                // 첫 달 계산 금액
+                let displayAmount = payment.amount;
                 if (isFirstMonth && payment.student_first_class_date && payment.course_tuition_fee) {
                   const firstClassDate = new Date(payment.student_first_class_date);
-                  const calculatedAmount = calculateProportionalTuition(
+                  displayAmount = calculateProportionalTuition(
                     payment.course_tuition_fee,
                     firstClassDate,
                     paymentYear,
                     paymentMonth
                   );
-                  const totalDaysInMonth = new Date(paymentYear, paymentMonth, 0).getDate();
-                  const firstClassDay = firstClassDate.getDate();
-                  const remainingDays = totalDaysInMonth - (firstClassDay - 1);
-                  
-                  firstMonthCalculation = {
-                    monthlyTuition: payment.course_tuition_fee,
-                    firstClassDate: payment.student_first_class_date,
-                    totalDaysInMonth,
-                    remainingDays,
-                    calculatedAmount,
-                  };
                 }
                 
-                // 마지막 달 환불 정보
-                let lastMonthRefund = null;
+                // 마지막 달 환불 금액
+                let refundAmount = 0;
                 if (isLastMonth && payment.student_last_class_date && payment.course_tuition_fee) {
                   const lastClassDate = new Date(payment.student_last_class_date);
-                  const refundAmount = calculateRefundAmount(
+                  refundAmount = calculateRefundAmount(
                     payment.course_tuition_fee,
                     lastClassDate,
                     paymentYear,
                     paymentMonth
                   );
-                  const totalDaysInMonth = new Date(paymentYear, paymentMonth, 0).getDate();
-                  const lastClassDay = lastClassDate.getDate();
-                  const unattendedDays = totalDaysInMonth - lastClassDay;
-                  
-                  lastMonthRefund = {
-                    monthlyTuition: payment.course_tuition_fee,
-                    lastClassDate: payment.student_last_class_date,
-                    totalDaysInMonth,
-                    attendedDays: lastClassDay,
-                    unattendedDays,
-                    refundAmount,
-                  };
                 }
 
                 return (
@@ -1209,38 +1252,25 @@ export default function PaymentsPage() {
                           className="w-4 h-4"
                         />
                       </TableCell>
-                      <TableCell>
-                        {(firstMonthCalculation || lastMonthRefund) && (
-                          <button
-                            onClick={() => {
-                              const newExpanded = new Set(expandedPayments);
-                              if (isExpanded) {
-                                newExpanded.delete(payment.id);
-                              } else {
-                                newExpanded.add(payment.id);
-                              }
-                              setExpandedPayments(newExpanded);
-                            }}
-                            className="text-gray-500 hover:text-gray-700"
-                            title="세부 정보 보기"
-                          >
-                            {isExpanded ? (
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
-                            ) : (
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                              </svg>
-                            )}
-                          </button>
-                        )}
-                      </TableCell>
+                      <TableCell></TableCell>
                       <TableCell className="font-medium">
                         {payment.student_name || '-'}
                       </TableCell>
                     <TableCell>{payment.course_name || '-'}</TableCell>
-                    <TableCell>{payment.amount.toLocaleString()}원</TableCell>
+                    <TableCell>
+                      {refundAmount > 0 ? (
+                        <div className="text-red-600 font-semibold">
+                          -{refundAmount.toLocaleString()}원
+                        </div>
+                      ) : (
+                        <div>
+                          {displayAmount.toLocaleString()}원
+                          {isFirstMonth && displayAmount !== payment.amount && (
+                            <span className="text-xs text-gray-500 ml-1">(첫달)</span>
+                          )}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <select
                         value={editingPayments[payment.id]?.payment_method !== undefined 
@@ -1290,55 +1320,6 @@ export default function PaymentsPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                    {isExpanded && (
-                      <TableRow key={`${payment.id}-detail`} className="bg-gray-50">
-                        <TableCell colSpan={8} className="p-4">
-                          <div className="space-y-4">
-                            {firstMonthCalculation && (
-                              <div className="border-l-4 border-blue-500 pl-4">
-                                <h4 className="font-semibold text-gray-900 mb-2">첫 달 수업료 계산</h4>
-                                <div className="text-sm text-gray-700 space-y-1">
-                                  <p>월 수강료: {firstMonthCalculation.monthlyTuition.toLocaleString()}원</p>
-                                  <p>첫 수업일: {new Date(firstMonthCalculation.firstClassDate).toLocaleDateString('ko-KR')}</p>
-                                  <p>해당 월 총 일수: {firstMonthCalculation.totalDaysInMonth}일</p>
-                                  <p>남은 일수: {firstMonthCalculation.remainingDays}일</p>
-                                  <p className="font-semibold text-blue-600">
-                                    계산된 수강료: {firstMonthCalculation.calculatedAmount.toLocaleString()}원
-                                    <span className="text-gray-500 text-xs ml-2">
-                                      ({firstMonthCalculation.monthlyTuition.toLocaleString()}원 × {firstMonthCalculation.remainingDays}일 ÷ {firstMonthCalculation.totalDaysInMonth}일)
-                                    </span>
-                                  </p>
-                                </div>
-                              </div>
-                            )}
-                            {lastMonthRefund && (
-                              <div className="border-l-4 border-red-500 pl-4">
-                                <h4 className="font-semibold text-gray-900 mb-2">마지막 달 환불 계산</h4>
-                                <div className="text-sm text-gray-700 space-y-1">
-                                  <p>월 수강료: {lastMonthRefund.monthlyTuition.toLocaleString()}원</p>
-                                  <p>마지막 수업일: {new Date(lastMonthRefund.lastClassDate).toLocaleDateString('ko-KR')}</p>
-                                  <p>해당 월 총 일수: {lastMonthRefund.totalDaysInMonth}일</p>
-                                  <p>수업한 일수: {lastMonthRefund.attendedDays}일</p>
-                                  <p>미수업 일수: {lastMonthRefund.unattendedDays}일</p>
-                                  <p className="font-semibold text-red-600">
-                                    환불 금액: {lastMonthRefund.refundAmount.toLocaleString()}원
-                                    <span className="text-gray-500 text-xs ml-2">
-                                      ({lastMonthRefund.monthlyTuition.toLocaleString()}원 × {lastMonthRefund.unattendedDays}일 ÷ {lastMonthRefund.totalDaysInMonth}일)
-                                    </span>
-                                  </p>
-                                </div>
-                              </div>
-                            )}
-                            {!firstMonthCalculation && !lastMonthRefund && (
-                              <div className="text-sm text-gray-500">
-                                일반 결제 항목입니다. (전액 수강료)
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </>
                 );
               })}
             </TableBody>
