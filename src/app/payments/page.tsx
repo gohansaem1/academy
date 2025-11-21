@@ -1242,7 +1242,6 @@ export default function PaymentsPage() {
                 }
 
                 return (
-                  <>
                     <TableRow key={payment.id}>
                       <TableCell>
                         <input
@@ -1321,7 +1320,7 @@ export default function PaymentsPage() {
                     </TableCell>
                   </TableRow>
                 );
-              })}
+              })
             </TableBody>
           </Table>
         </div>
