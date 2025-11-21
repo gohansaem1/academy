@@ -125,7 +125,18 @@ export default function PaymentsPage() {
   };
 
   const calculateStatistics = () => {
-    const filtered = getFilteredPayments();
+    // 통계는 검색어, 타입 필터, 상태 필터를 제외하고 월 필터만 적용
+    let statsData = [...payments];
+
+    // 월 필터만 적용 (전체 기간이 아닐 때)
+    if (!showAllPeriod) {
+      const [year, month] = selectedMonth.split('-').map(Number);
+      statsData = statsData.filter(p => {
+        const paymentDate = new Date(p.payment_date);
+        return paymentDate.getFullYear() === year &&
+               paymentDate.getMonth() + 1 === month;
+      });
+    }
     
     const stats: Statistics = {
       totalRevenue: 0,
@@ -137,7 +148,7 @@ export default function PaymentsPage() {
       pendingRefunds: 0,
     };
 
-    filtered.forEach(payment => {
+    statsData.forEach(payment => {
       const amount = Math.abs(payment.amount);
       
       if (payment.type === 'payment') {
