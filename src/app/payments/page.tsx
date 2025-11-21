@@ -1242,7 +1242,7 @@ export default function PaymentsPage() {
                 }
 
                 return (
-                    <TableRow key={payment.id}>
+                  <TableRow key={payment.id}>
                       <TableCell>
                         <input
                           type="checkbox"
@@ -1320,7 +1320,7 @@ export default function PaymentsPage() {
                     </TableCell>
                   </TableRow>
                 );
-              })
+              })}
             </TableBody>
           </Table>
         </div>
