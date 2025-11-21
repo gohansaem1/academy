@@ -253,16 +253,119 @@ export async function updateRefundsForLastClassDate(
 ): Promise<void> {
   try {
     // 기존 환불 항목 삭제
-    await supabase
+    const { error: deleteError } = await supabase
       .from('payments')
       .delete()
       .eq('student_id', studentId)
       .eq('type', 'refund');
 
+    if (deleteError) {
+      console.error('기존 환불 항목 삭제 오류:', deleteError);
+    }
+
     // 새로운 마지막 수업일이 있으면 환불 생성
     if (newLastClassDate) {
-      const { createRefundForInactiveStudent } = await import('./refund');
-      await createRefundForInactiveStudent(studentId, newLastClassDate);
+      // 학생이 수강 중인 모든 수업 조회
+      const { data: enrollments, error: enrollmentsError } = await supabase
+        .from('course_enrollments')
+        .select(`
+          course_id,
+          courses!inner(
+            id,
+            name,
+            tuition_fee
+          )
+        `)
+        .eq('student_id', studentId);
+
+      if (enrollmentsError) {
+        console.error('수업 등록 조회 오류:', enrollmentsError);
+        return;
+      }
+
+      if (!enrollments || enrollments.length === 0) {
+        console.log('수강 중인 수업이 없어 환불 항목을 생성하지 않습니다.');
+        return;
+      }
+
+      // 학생 정보 조회 (payment_due_day 필요)
+      const { data: studentData, error: studentError } = await supabase
+        .from('students')
+        .select('payment_due_day')
+        .eq('id', studentId)
+        .single();
+
+      if (studentError) {
+        console.error('학생 정보 조회 오류:', studentError);
+        return;
+      }
+
+      const dueDay = studentData?.payment_due_day || 25;
+      const lastDate = new Date(newLastClassDate);
+      const lastYear = lastDate.getFullYear();
+      const lastMonth = lastDate.getMonth() + 1;
+
+      // 각 수업에 대해 환불 계산 및 생성
+      for (const enrollment of enrollments) {
+        const course = (enrollment as any).courses;
+        if (!course || !course.tuition_fee) continue;
+
+        // 마지막 수업일이 속한 달의 환불 금액 계산
+        const { calculateRefundAmount } = await import('./tuition');
+        const refundAmount = calculateRefundAmount(
+          course.tuition_fee,
+          lastDate,
+          lastYear,
+          lastMonth
+        );
+
+        if (refundAmount <= 0) {
+          console.log(`환불 금액이 0이므로 스킵 (수업: ${course.name})`);
+          continue;
+        }
+
+        // 환불일 계산 (마지막 수업일이 속한 달의 결제일)
+        const refundDate = new Date(lastYear, lastMonth - 1, dueDay);
+        const refundDateStr = refundDate.toISOString().split('T')[0];
+
+        // 이미 환불이 생성되어 있는지 확인 (같은 달, 같은 수업)
+        const refundMonthStart = new Date(lastYear, lastMonth - 1, 1);
+        const refundMonthEnd = new Date(lastYear, lastMonth, 0);
+        
+        const { data: existingRefund } = await supabase
+          .from('payments')
+          .select('id')
+          .eq('student_id', studentId)
+          .eq('course_id', course.id)
+          .eq('type', 'refund')
+          .gte('payment_date', refundMonthStart.toISOString().split('T')[0])
+          .lte('payment_date', refundMonthEnd.toISOString().split('T')[0])
+          .maybeSingle();
+
+        if (existingRefund) {
+          console.log(`이미 환불이 존재하므로 스킵 (수업: ${course.name})`);
+          continue;
+        }
+
+        // 환불 항목 생성 (음수 금액으로 저장)
+        const { error: refundError } = await supabase
+          .from('payments')
+          .insert([{
+            student_id: studentId,
+            course_id: course.id,
+            amount: -refundAmount, // 음수로 저장
+            payment_method: 'card', // 기본값
+            payment_date: refundDateStr, // 마지막 수업일이 속한 달의 결제일
+            status: 'pending', // 기본값: 미지급
+            type: 'refund',
+          }]);
+
+        if (refundError) {
+          console.error(`환불 생성 오류 (수업: ${course.name}):`, refundError);
+        } else {
+          console.log(`환불 항목 생성 완료 (수업: ${course.name}, 금액: ${refundAmount}원)`);
+        }
+      }
     }
   } catch (error) {
     console.error('마지막 수업일 변경 시 환불 항목 업데이트 오류:', error);
