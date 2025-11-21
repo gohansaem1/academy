@@ -133,6 +133,7 @@ export default function EnrollStudentPage() {
             payment_method: 'card', // 기본값: 카드
             payment_date: paymentDate.toISOString().split('T')[0],
             status: 'pending', // 기본값: 미납
+            type: 'payment', // 수강료
           }]);
 
         if (currentMonthPaymentError) {
@@ -154,6 +155,7 @@ export default function EnrollStudentPage() {
           payment_method: 'card',
           payment_date: nextMonthPaymentDate.toISOString().split('T')[0],
           status: 'pending',
+          type: 'payment', // 수강료
         }]);
 
       if (nextMonthPaymentError) {

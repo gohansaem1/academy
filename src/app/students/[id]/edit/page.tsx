@@ -232,6 +232,8 @@ export default function EditStudentPage() {
             }}
             onBlur={async () => {
               const lastClassDateValue = lastClassDate || null;
+              const previousLastClassDate = currentStudent?.last_class_date || null;
+              
               try {
                 // 마지막 수업일 업데이트 (상태는 자동으로 업데이트됨)
                 const { error: updateError } = await supabase
@@ -243,11 +245,19 @@ export default function EditStudentPage() {
                 
                 // 자동 상태 업데이트 확인
                 const { autoUpdateStudentStatusIfNeeded } = await import('@/lib/utils/student-status');
-                await autoUpdateStudentStatusIfNeeded(
+                const statusChanged = await autoUpdateStudentStatusIfNeeded(
                   params.id as string,
                   currentStudent?.status || 'active',
                   lastClassDateValue
                 );
+                
+                // 마지막 수업일이 새로 입력되었거나 변경되었고, 학생이 inactive 상태이면 환불 생성
+                if (lastClassDateValue && 
+                    (statusChanged || currentStudent?.status === 'inactive') &&
+                    lastClassDateValue !== previousLastClassDate) {
+                  const { createRefundForInactiveStudent } = await import('@/lib/utils/refund');
+                  await createRefundForInactiveStudent(params.id as string, lastClassDateValue);
+                }
                 
                 // 폼 데이터 새로고침
                 fetchStudent(params.id as string);
