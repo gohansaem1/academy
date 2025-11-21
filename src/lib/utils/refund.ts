@@ -57,14 +57,31 @@ export async function createRefundForInactiveStudent(
 
       if (refundAmount <= 0) continue; // 환불 금액이 없으면 스킵
 
+      // 학생 정보 조회 (payment_due_day 필요)
+      const { data: studentData } = await supabase
+        .from('students')
+        .select('payment_due_day')
+        .eq('id', studentId)
+        .single();
+
+      const dueDay = studentData?.payment_due_day || 25;
+
+      // 환불일 계산 (마지막 수업일이 속한 달의 결제일)
+      const refundDate = new Date(lastYear, lastMonth - 1, dueDay);
+      const refundDateStr = refundDate.toISOString().split('T')[0];
+
       // 이미 환불이 생성되어 있는지 확인 (같은 달, 같은 수업)
+      const refundMonthStart = new Date(lastYear, lastMonth - 1, 1);
+      const refundMonthEnd = new Date(lastYear, lastMonth, 0);
+      
       const { data: existingRefund } = await supabase
         .from('payments')
         .select('id')
         .eq('student_id', studentId)
         .eq('course_id', course.id)
         .eq('type', 'refund')
-        .eq('payment_date', lastClassDate)
+        .gte('payment_date', refundMonthStart.toISOString().split('T')[0])
+        .lte('payment_date', refundMonthEnd.toISOString().split('T')[0])
         .maybeSingle();
 
       if (existingRefund) {
@@ -79,7 +96,7 @@ export async function createRefundForInactiveStudent(
           course_id: course.id,
           amount: -refundAmount, // 음수로 저장
           payment_method: 'card', // 기본값
-          payment_date: lastClassDate,
+          payment_date: refundDateStr, // 마지막 수업일이 속한 달의 결제일
           status: 'pending', // 기본값: 미지급
           type: 'refund',
         }]);
