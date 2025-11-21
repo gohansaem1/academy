@@ -123,12 +123,18 @@ export default function EditStudentPage() {
 
       // 첫 수업일이 변경되었으면 결제 항목 업데이트
       if (oldFirstClassDate !== newFirstClassDate) {
-        const { updatePaymentsForFirstClassDate } = await import('@/lib/utils/payment-cleanup');
-        await updatePaymentsForFirstClassDate(
-          params.id as string,
-          newFirstClassDate,
-          oldFirstClassDate
-        );
+        try {
+          const { updatePaymentsForFirstClassDate } = await import('@/lib/utils/payment-cleanup');
+          await updatePaymentsForFirstClassDate(
+            params.id as string,
+            newFirstClassDate,
+            oldFirstClassDate
+          );
+          console.log('결제 항목 업데이트 완료');
+        } catch (error) {
+          console.error('결제 항목 업데이트 오류:', error);
+          alert('학생 정보는 수정되었지만 결제 항목 업데이트 중 오류가 발생했습니다. 수강료 관리 페이지에서 확인해주세요.');
+        }
       }
 
       alert('학생 정보가 수정되었습니다.');
@@ -266,12 +272,18 @@ export default function EditStudentPage() {
                 
                 // 마지막 수업일이 변경되었으면 환불 항목 재생성
                 if (lastClassDateValue !== previousLastClassDate) {
-                  const { updateRefundsForLastClassDate } = await import('@/lib/utils/payment-cleanup');
-                  await updateRefundsForLastClassDate(
-                    params.id as string,
-                    lastClassDateValue,
-                    previousLastClassDate
-                  );
+                  try {
+                    const { updateRefundsForLastClassDate } = await import('@/lib/utils/payment-cleanup');
+                    await updateRefundsForLastClassDate(
+                      params.id as string,
+                      lastClassDateValue,
+                      previousLastClassDate
+                    );
+                    console.log('환불 항목 업데이트 완료');
+                  } catch (error) {
+                    console.error('환불 항목 업데이트 오류:', error);
+                    alert('마지막 수업일은 업데이트되었지만 환불 항목 업데이트 중 오류가 발생했습니다. 수강료 관리 페이지에서 확인해주세요.');
+                  }
                 }
                 
                 // 폼 데이터 새로고침

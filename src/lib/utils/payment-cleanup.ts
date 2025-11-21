@@ -98,14 +98,21 @@ export async function updatePaymentsForFirstClassDate(
 
       const courseId = enrollment.course_id;
 
-      // 새로운 첫 수업일 이전의 결제 항목 삭제
+      // 새로운 첫 수업일이 속한 달의 시작일 계산
+      const firstYear = newFirstDate.getFullYear();
+      const firstMonth = newFirstDate.getMonth() + 1;
+      const firstMonthStart = new Date(firstYear, firstMonth - 1, 1);
+      const firstMonthStartStr = firstMonthStart.toISOString().split('T')[0];
+
+      // 새로운 첫 수업일 이전 달의 모든 결제 항목 삭제
+      // (첫 수업일이 속한 달의 결제 항목은 삭제하지 않고 업데이트)
       await supabase
         .from('payments')
         .delete()
         .eq('student_id', studentId)
         .eq('course_id', courseId)
         .eq('type', 'payment')
-        .lt('payment_date', newFirstDate.toISOString().split('T')[0]);
+        .lt('payment_date', firstMonthStartStr);
 
       // 새로운 첫 수업일이 속한 달의 결제 항목이 있는지 확인
       const firstYear = newFirstDate.getFullYear();
@@ -120,79 +127,114 @@ export async function updatePaymentsForFirstClassDate(
         .eq('student_id', studentId)
         .eq('course_id', courseId)
         .eq('type', 'payment')
-        .gte('payment_date', firstMonthStart.toISOString().split('T')[0])
+        .gte('payment_date', firstMonthStartStr)
         .lte('payment_date', firstMonthEnd.toISOString().split('T')[0]);
 
-      // 해당 달의 결제 항목이 없으면 생성
-      if (!existingPayments || existingPayments.length === 0) {
-        const proportionalAmount = calculateProportionalTuition(
-          course.tuition_fee,
-          newFirstDate,
-          firstYear,
-          firstMonth
-        );
+      // 비례 계산된 금액 계산
+      const proportionalAmount = calculateProportionalTuition(
+        course.tuition_fee,
+        newFirstDate,
+        firstYear,
+        firstMonth
+      );
 
-        if (proportionalAmount > 0) {
-          const paymentDate = new Date(firstYear, firstMonth - 1, dueDay);
-          
-          await supabase
+      if (proportionalAmount > 0) {
+        const paymentDate = new Date(firstYear, firstMonth - 1, dueDay);
+        const paymentDateStr = paymentDate.toISOString().split('T')[0];
+
+        // 해당 달의 결제 항목이 없으면 생성
+        if (!existingPayments || existingPayments.length === 0) {
+          const { error: insertError } = await supabase
             .from('payments')
             .insert([{
               student_id: studentId,
               course_id: courseId,
               amount: proportionalAmount,
               payment_method: 'card',
-              payment_date: paymentDate.toISOString().split('T')[0],
+              payment_date: paymentDateStr,
               status: 'pending',
               type: 'payment',
             }]);
+
+          if (insertError) {
+            console.error('첫 달 결제 항목 생성 오류:', insertError);
+          }
+        } else {
+          // 기존 결제 항목이 있으면 금액과 결제일 업데이트
+          const { error: updateError } = await supabase
+            .from('payments')
+            .update({ 
+              amount: proportionalAmount,
+              payment_date: paymentDateStr
+            })
+            .eq('id', existingPayments[0].id);
+
+          if (updateError) {
+            console.error('첫 달 결제 항목 업데이트 오류:', updateError);
+          }
         }
       } else {
-        // 기존 결제 항목이 있으면 금액만 업데이트
-        const proportionalAmount = calculateProportionalTuition(
-          course.tuition_fee,
-          newFirstDate,
-          firstYear,
-          firstMonth
-        );
-
-        if (proportionalAmount > 0) {
+        // 비례 계산 금액이 0이면 해당 달 결제 항목 삭제
+        if (existingPayments && existingPayments.length > 0) {
           await supabase
             .from('payments')
-            .update({ amount: proportionalAmount })
+            .delete()
             .eq('id', existingPayments[0].id);
         }
       }
 
-      // 다음 달 결제 항목이 있는지 확인하고 없으면 생성
-      const nextMonth = firstMonth === 12 ? 1 : firstMonth + 1;
-      const nextYear = firstMonth === 12 ? firstYear + 1 : firstYear;
-      const nextMonthStart = new Date(nextYear, nextMonth - 1, 1);
-      const nextMonthEnd = new Date(nextYear, nextMonth, 0);
+      // 첫 수업일 이후의 모든 결제 항목 재생성
+      // 현재 날짜부터 12개월 후까지의 결제 항목 생성
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const endDate = new Date(today);
+      endDate.setMonth(endDate.getMonth() + 12);
 
-      const { data: nextMonthPayments } = await supabase
-        .from('payments')
-        .select('*')
-        .eq('student_id', studentId)
-        .eq('course_id', courseId)
-        .eq('type', 'payment')
-        .gte('payment_date', nextMonthStart.toISOString().split('T')[0])
-        .lte('payment_date', nextMonthEnd.toISOString().split('T')[0]);
+      let currentDate = new Date(firstMonthStart);
+      currentDate.setMonth(currentDate.getMonth() + 1); // 첫 달 다음 달부터 시작
 
-      if (!nextMonthPayments || nextMonthPayments.length === 0) {
-        const nextMonthPaymentDate = new Date(nextYear, nextMonth - 1, dueDay);
-        
-        await supabase
+      while (currentDate <= endDate) {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth() + 1;
+        const monthStart = new Date(year, month - 1, 1);
+        const monthEnd = new Date(year, month, 0);
+        const monthStartStr = monthStart.toISOString().split('T')[0];
+        const monthEndStr = monthEnd.toISOString().split('T')[0];
+
+        // 해당 달의 결제 항목 조회
+        const { data: monthPayments } = await supabase
           .from('payments')
-          .insert([{
-            student_id: studentId,
-            course_id: courseId,
-            amount: course.tuition_fee,
-            payment_method: 'card',
-            payment_date: nextMonthPaymentDate.toISOString().split('T')[0],
-            status: 'pending',
-            type: 'payment',
-          }]);
+          .select('*')
+          .eq('student_id', studentId)
+          .eq('course_id', courseId)
+          .eq('type', 'payment')
+          .gte('payment_date', monthStartStr)
+          .lte('payment_date', monthEndStr);
+
+        if (!monthPayments || monthPayments.length === 0) {
+          // 결제 항목이 없으면 생성
+          const paymentDate = new Date(year, month - 1, dueDay);
+          const paymentDateStr = paymentDate.toISOString().split('T')[0];
+
+          const { error: insertError } = await supabase
+            .from('payments')
+            .insert([{
+              student_id: studentId,
+              course_id: courseId,
+              amount: course.tuition_fee, // 첫 달 이후는 전액
+              payment_method: 'card',
+              payment_date: paymentDateStr,
+              status: 'pending',
+              type: 'payment',
+            }]);
+
+          if (insertError) {
+            console.error(`${year}년 ${month}월 결제 항목 생성 오류:`, insertError);
+          }
+        }
+
+        // 다음 달로 이동
+        currentDate.setMonth(currentDate.getMonth() + 1);
       }
     }
   } catch (error) {
