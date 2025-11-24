@@ -10,6 +10,7 @@ export interface LearningLog {
   created_at: string;
   updated_at: string;
   course_name?: string;
+  course_subject?: string;
   instructor_name?: string;
 }
 
