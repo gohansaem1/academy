@@ -67,7 +67,7 @@ export default function KPIPage() {
       // 학생당 평균 수강 과목 수
       const { data: enrollments } = await supabase
         .from('course_enrollments')
-        .select('student_id');
+        .select('student_id, course_id');
 
       const studentCourseCounts: Record<string, number> = {};
       enrollments?.forEach(e => {
