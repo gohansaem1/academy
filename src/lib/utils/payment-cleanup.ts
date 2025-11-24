@@ -277,6 +277,7 @@ export async function updatePaymentsForFirstClassDate(
           currentDate.setMonth(currentDate.getMonth() + 1);
         }
       }
+    }
   } catch (error) {
     console.error('첫 수업일 변경 시 결제 항목 업데이트 오류:', error);
   }
