@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
-import { Course } from '@/types/course';
+import { Course, CourseSchedule } from '@/types/course';
 import { Student } from '@/types/student';
 import { Attendance } from '@/types/attendance';
 import { useAuth } from '@/hooks/useAuth';
@@ -70,7 +70,7 @@ export default function NewAttendancePage() {
       const coursesForDate = (data || []).filter(course => {
         if (course.schedule && Array.isArray(course.schedule) && course.schedule.length > 0) {
           // 새로운 schedule 필드 사용
-          return course.schedule.some(s => s.day_of_week === dayOfWeek);
+          return course.schedule.some((s: CourseSchedule) => s.day_of_week === dayOfWeek);
         } else {
           // 기존 day_of_week 필드 사용 (하위 호환성)
           return course.day_of_week === dayOfWeek;
