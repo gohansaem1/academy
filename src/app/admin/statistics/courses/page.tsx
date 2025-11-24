@@ -49,14 +49,17 @@ export default function CourseStatisticsPage() {
 
       const activeCourses = courses?.length || 0;
 
-      // 수업별 등록 학생 수
+      // 수업별 등록 학생 수 (재학생만 카운트)
       const { data: enrollments } = await supabase
         .from('course_enrollments')
-        .select('course_id');
+        .select('course_id, student_id, students!inner(status)');
 
       const enrollmentCounts: Record<string, number> = {};
-      enrollments?.forEach(e => {
-        enrollmentCounts[e.course_id] = (enrollmentCounts[e.course_id] || 0) + 1;
+      enrollments?.forEach((e: any) => {
+        // 재학생만 카운트
+        if (e.students && (e.students.status === 'active' || !e.students.status)) {
+          enrollmentCounts[e.course_id] = (enrollmentCounts[e.course_id] || 0) + 1;
+        }
       });
 
       const totalEnrollments = Object.values(enrollmentCounts).reduce((sum, count) => sum + count, 0);
@@ -87,27 +90,59 @@ export default function CourseStatisticsPage() {
         bySubject[subject].averageEnrollment = bySubject[subject].totalEnrollment / bySubject[subject].count;
       });
 
-      // 요일별 분포
+      // 요일별 분포 (schedule 필드의 모든 요일 고려)
       const DAYS_OF_WEEK = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
       const byDayOfWeek: Record<string, number> = {};
       courses?.forEach(course => {
-        const dayName = DAYS_OF_WEEK[course.day_of_week];
-        byDayOfWeek[dayName] = (byDayOfWeek[dayName] || 0) + 1;
+        if (course.schedule && Array.isArray(course.schedule) && course.schedule.length > 0) {
+          // schedule의 각 요일을 카운트
+          course.schedule.forEach((sched: any) => {
+            const dayIndex = sched.day_of_week;
+            if (dayIndex >= 0 && dayIndex <= 6) {
+              const dayName = DAYS_OF_WEEK[dayIndex];
+              byDayOfWeek[dayName] = (byDayOfWeek[dayName] || 0) + 1;
+            }
+          });
+        } else if (course.day_of_week !== null && course.day_of_week !== undefined) {
+          // 호환성을 위해 day_of_week 사용
+          const dayName = DAYS_OF_WEEK[course.day_of_week];
+          byDayOfWeek[dayName] = (byDayOfWeek[dayName] || 0) + 1;
+        }
       });
 
-      // 시간대별 분포
+      // 시간대별 분포 (schedule 필드의 모든 시간대 고려)
       const byTimeSlot: Record<string, number> = {};
       courses?.forEach(course => {
-        const startHour = parseInt(course.start_time.split(':')[0]);
-        let slot = '';
-        if (startHour < 12) {
-          slot = '09:00-12:00';
-        } else if (startHour < 16) {
-          slot = '13:00-16:00';
-        } else {
-          slot = '16:00-19:00';
+        if (course.schedule && Array.isArray(course.schedule) && course.schedule.length > 0) {
+          // schedule의 각 시간대를 카운트
+          course.schedule.forEach((sched: any) => {
+            const startTime = sched.start_time || course.start_time;
+            if (startTime) {
+              const startHour = parseInt(startTime.split(':')[0]);
+              let slot = '';
+              if (startHour < 12) {
+                slot = '09:00-12:00';
+              } else if (startHour < 16) {
+                slot = '13:00-16:00';
+              } else {
+                slot = '16:00-19:00';
+              }
+              byTimeSlot[slot] = (byTimeSlot[slot] || 0) + 1;
+            }
+          });
+        } else if (course.start_time) {
+          // 호환성을 위해 start_time 사용
+          const startHour = parseInt(course.start_time.split(':')[0]);
+          let slot = '';
+          if (startHour < 12) {
+            slot = '09:00-12:00';
+          } else if (startHour < 16) {
+            slot = '13:00-16:00';
+          } else {
+            slot = '16:00-19:00';
+          }
+          byTimeSlot[slot] = (byTimeSlot[slot] || 0) + 1;
         }
-        byTimeSlot[slot] = (byTimeSlot[slot] || 0) + 1;
       });
 
       // 인기 수업 (등록률 기준)

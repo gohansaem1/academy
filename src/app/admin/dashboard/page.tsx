@@ -9,6 +9,7 @@ import Button from '@/components/common/Button';
 interface DashboardOverview {
   totalStudents: number;
   inactiveStudents?: number;
+  dropoutRate?: number; // 이탈률
   totalInstructors: number;
   totalCourses: number;
   activeEnrollments: number;
@@ -70,10 +71,14 @@ export default function AdminDashboardPage() {
         .from('courses')
         .select('*', { count: 'exact', head: true });
 
-      // 활성 등록 수
-      const { count: enrollmentCount } = await supabase
+      // 활성 등록 수 (재학생의 등록만 카운트)
+      const { data: allEnrollments } = await supabase
         .from('course_enrollments')
-        .select('*', { count: 'exact', head: true });
+        .select('student_id, students!inner(status)');
+      
+      const activeEnrollmentCount = allEnrollments?.filter((item: any) => 
+        item.students && (item.students.status === 'active' || !item.students.status)
+      ).length || 0;
 
       // 이번 달 수강료 수납액
       const now = new Date();
@@ -82,12 +87,13 @@ export default function AdminDashboardPage() {
 
       const { data: thisMonthPayments } = await supabase
         .from('payments')
-        .select('amount')
+        .select('amount, type')
+        .eq('type', 'payment')
         .eq('status', 'confirmed')
         .gte('payment_date', firstDayOfMonth)
         .lte('payment_date', lastDayOfMonth);
 
-      const monthlyRevenue = thisMonthPayments?.reduce((sum, p) => sum + p.amount, 0) || 0;
+      const monthlyRevenue = thisMonthPayments?.reduce((sum, p) => sum + Math.abs(p.amount), 0) || 0;
 
       // 지난 달 수강료 수납액
       const firstDayOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
@@ -95,47 +101,65 @@ export default function AdminDashboardPage() {
 
       const { data: lastMonthPayments } = await supabase
         .from('payments')
-        .select('amount')
+        .select('amount, type')
+        .eq('type', 'payment')
         .eq('status', 'confirmed')
         .gte('payment_date', firstDayOfLastMonth)
         .lte('payment_date', lastDayOfLastMonth);
 
-      const lastMonthRevenue = lastMonthPayments?.reduce((sum, p) => sum + p.amount, 0) || 0;
+      const lastMonthRevenue = lastMonthPayments?.reduce((sum, p) => sum + Math.abs(p.amount), 0) || 0;
       const monthlyRevenueGrowth = lastMonthRevenue > 0 
         ? ((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 
         : 0;
 
-      // 출석률 계산 (결석만 제외, 출석/지각/조퇴는 모두 출석으로 간주)
+      // 출석률 계산 (재학생의 출석만 고려, 결석만 제외, 출석/지각/조퇴는 모두 출석으로 간주)
       const { data: attendanceData } = await supabase
         .from('attendance')
-        .select('status')
+        .select('status, student_id, students!inner(status)')
         .gte('date', firstDayOfMonth)
         .lte('date', lastDayOfMonth);
 
-      const totalSessions = attendanceData?.length || 0;
-      const presentSessions = attendanceData?.filter(a => a.status !== 'absent').length || 0;
+      // 재학생의 출석만 필터링
+      const activeAttendance = attendanceData?.filter((item: any) => 
+        item.students && (item.students.status === 'active' || !item.students.status)
+      ) || [];
+      
+      const totalSessions = activeAttendance.length || 0;
+      const presentSessions = activeAttendance.filter((a: any) => a.status !== 'absent').length || 0;
       const attendanceRate = totalSessions > 0 ? (presentSessions / totalSessions) * 100 : 0;
 
-      // 지난 달 출석률 (결석만 제외, 출석/지각/조퇴는 모두 출석으로 간주)
+      // 지난 달 출석률 (재학생의 출석만 고려, 결석만 제외, 출석/지각/조퇴는 모두 출석으로 간주)
       const { data: lastMonthAttendance } = await supabase
         .from('attendance')
-        .select('status')
+        .select('status, student_id, students!inner(status)')
         .gte('date', firstDayOfLastMonth)
         .lte('date', lastDayOfLastMonth);
 
-      const lastMonthTotal = lastMonthAttendance?.length || 0;
-      const lastMonthPresent = lastMonthAttendance?.filter(a => a.status !== 'absent').length || 0;
+      // 재학생의 출석만 필터링
+      const activeLastMonthAttendance = lastMonthAttendance?.filter((item: any) => 
+        item.students && (item.students.status === 'active' || !item.students.status)
+      ) || [];
+      
+      const lastMonthTotal = activeLastMonthAttendance.length || 0;
+      const lastMonthPresent = activeLastMonthAttendance.filter((a: any) => a.status !== 'absent').length || 0;
       const lastMonthAttendanceRate = lastMonthTotal > 0 ? (lastMonthPresent / lastMonthTotal) * 100 : 0;
       const attendanceRateGrowth = lastMonthAttendanceRate > 0 
         ? attendanceRate - lastMonthAttendanceRate 
         : 0;
 
+      // 이탈률 계산 (그만둔 학생 수 / 전체 학생 수 * 100)
+      const totalAllStudents = (studentCount || 0) + (inactiveStudentCount || 0);
+      const dropoutRate = totalAllStudents > 0 
+        ? ((inactiveStudentCount || 0) / totalAllStudents) * 100 
+        : 0;
+
       setOverview({
         totalStudents: studentCount || 0,
         inactiveStudents: inactiveStudentCount || 0,
+        dropoutRate: Math.round(dropoutRate * 10) / 10,
         totalInstructors: instructorCount || 0,
         totalCourses: courseCount || 0,
-        activeEnrollments: enrollmentCount || 0,
+        activeEnrollments: activeEnrollmentCount,
         monthlyRevenue,
         monthlyRevenueGrowth: Math.round(monthlyRevenueGrowth * 10) / 10,
         attendanceRate: Math.round(attendanceRate * 10) / 10,
@@ -154,10 +178,11 @@ export default function AdminDashboardPage() {
         .select('*', { count: 'exact', head: true })
         .gte('created_at', firstDayOfMonth);
 
-      // 대기 중인 결제 수
+      // 대기 중인 결제 수 (수강료만, 환불 제외)
       const { count: pendingPayments } = await supabase
         .from('payments')
         .select('*', { count: 'exact', head: true })
+        .eq('type', 'payment')
         .eq('status', 'pending');
 
       // 출석률이 낮은 학생 수 (70% 미만, 재학생만)
@@ -245,7 +270,12 @@ export default function AdminDashboardPage() {
                 <p className="text-sm text-gray-500 mb-1">재학생 수</p>
                 <p className="text-3xl font-bold">{overview.totalStudents}명</p>
                 {overview.inactiveStudents !== undefined && overview.inactiveStudents > 0 && (
-                  <p className="text-xs text-gray-400 mt-1">그만둔: {overview.inactiveStudents}명</p>
+                  <div className="mt-1">
+                    <p className="text-xs text-gray-400">그만둔: {overview.inactiveStudents}명</p>
+                    {overview.dropoutRate !== undefined && (
+                      <p className="text-xs text-red-500 font-medium">이탈률: {overview.dropoutRate}%</p>
+                    )}
+                  </div>
                 )}
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">

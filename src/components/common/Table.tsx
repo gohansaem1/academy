@@ -31,9 +31,16 @@ export function TableBody({ children, className = '' }: TableProps) {
   );
 }
 
-export function TableRow({ children, className = '' }: TableProps) {
+interface TableRowProps extends TableProps {
+  onClick?: () => void;
+}
+
+export function TableRow({ children, className = '', onClick }: TableRowProps) {
   return (
-    <tr className={`border-b transition-colors hover:bg-gray-50/50 data-[state=selected]:bg-gray-100 ${className}`}>
+    <tr 
+      className={`border-b transition-colors hover:bg-gray-50/50 data-[state=selected]:bg-gray-100 ${className} ${onClick ? 'cursor-pointer' : ''}`}
+      onClick={onClick}
+    >
       {children}
     </tr>
   );

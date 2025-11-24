@@ -53,10 +53,19 @@ export default function StudentStatisticsPage() {
       const firstDayOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
       const lastDayOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
 
-      // 전체 학생 수
-      const { count: total } = await supabase
+      // 전체 학생 수 (재학생만)
+      const { count: totalActive } = await supabase
         .from('students')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true })
+        .or('status.is.null,status.eq.active');
+      
+      const { count: totalInactive } = await supabase
+        .from('students')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'inactive');
+      
+      const total = totalActive || 0; // 재학생 수만
+      const totalAllStudents = (totalActive || 0) + (totalInactive || 0); // 이탈률 계산용
 
       // 이번 달 신규 학생
       const { count: newThisMonth } = await supabase
@@ -76,11 +85,24 @@ export default function StudentStatisticsPage() {
         ? ((newThisMonth || 0) - newLastMonth) / newLastMonth * 100 
         : 0;
 
-      // 이탈 학생 수 (삭제된 학생, 실제로는 삭제하지 않으므로 이번 달 등록 후 이탈한 경우를 계산)
-      // 실제 구현에서는 학생 상태를 관리하는 필드가 필요할 수 있습니다
-      const dropoutThisMonth = 0; // 임시값
-      const dropoutLastMonth = 0; // 임시값
-      const dropoutRate = total && total > 0 ? (dropoutThisMonth / total) * 100 : 0;
+      // 이번 달 이탈 학생 수 (이번 달에 status가 inactive로 변경된 학생)
+      const { count: dropoutThisMonth } = await supabase
+        .from('students')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'inactive')
+        .gte('updated_at', firstDayOfMonth)
+        .lte('updated_at', lastDayOfMonth);
+
+      // 지난 달 이탈 학생 수
+      const { count: dropoutLastMonth } = await supabase
+        .from('students')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'inactive')
+        .gte('updated_at', firstDayOfLastMonth)
+        .lte('updated_at', lastDayOfLastMonth);
+
+      // 전체 이탈률 (그만둔 학생 수 / (재학생 수 + 그만둔 학생 수) * 100)
+      const dropoutRate = totalAllStudents > 0 ? ((totalInactive || 0) / totalAllStudents) * 100 : 0;
 
       // 학생별 수강 과목 수 계산
       const { data: enrollments } = await supabase
@@ -139,24 +161,32 @@ export default function StudentStatisticsPage() {
           .gte('created_at', monthFirst)
           .lte('created_at', monthLast);
 
+        // 해당 월에 이탈한 학생 수 (status가 inactive로 변경된 학생)
+        const { count: monthDropout } = await supabase
+          .from('students')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'inactive')
+          .gte('updated_at', monthFirst)
+          .lte('updated_at', monthLast);
+
         trend.push({
           period: `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`,
           new: monthNew || 0,
-          dropout: 0, // 실제 구현 필요
-          net: monthNew || 0,
+          dropout: monthDropout || 0,
+          net: (monthNew || 0) - (monthDropout || 0),
         });
       }
 
       setStats({
-        total: total || 0,
+        total: total,
         newStudents: {
           thisMonth: newThisMonth || 0,
           lastMonth: newLastMonth || 0,
           growth: Math.round(growth * 10) / 10,
         },
         dropoutStudents: {
-          thisMonth: dropoutThisMonth,
-          lastMonth: dropoutLastMonth,
+          thisMonth: dropoutThisMonth || 0,
+          lastMonth: dropoutLastMonth || 0,
           dropoutRate: Math.round(dropoutRate * 10) / 10,
         },
         trend,
@@ -212,7 +242,7 @@ export default function StudentStatisticsPage() {
       {stats && (
         <>
           {/* 전체 통계 카드 */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white border rounded-lg p-6">
               <p className="text-sm text-gray-500 mb-2">전체 학생 수</p>
               <p className="text-3xl font-bold">{stats.total}명</p>
@@ -225,8 +255,18 @@ export default function StudentStatisticsPage() {
               </p>
             </div>
             <div className="bg-white border rounded-lg p-6">
-              <p className="text-sm text-gray-500 mb-2">학생당 평균 수강 과목</p>
-              <p className="text-3xl font-bold">{stats.averageCoursesPerStudent}개</p>
+              <p className="text-sm text-gray-500 mb-2">이번 달 이탈 학생</p>
+              <p className="text-3xl font-bold text-red-600">{stats.dropoutStudents.thisMonth}명</p>
+              {stats.dropoutStudents.lastMonth > 0 && (
+                <p className="text-sm mt-2 text-gray-500">
+                  지난 달: {stats.dropoutStudents.lastMonth}명
+                </p>
+              )}
+            </div>
+            <div className="bg-white border rounded-lg p-6">
+              <p className="text-sm text-gray-500 mb-2">전체 이탈률</p>
+              <p className="text-3xl font-bold text-red-600">{stats.dropoutStudents.dropoutRate}%</p>
+              <p className="text-sm mt-2 text-gray-500">학생당 평균 수강: {stats.averageCoursesPerStudent}개</p>
             </div>
           </div>
 

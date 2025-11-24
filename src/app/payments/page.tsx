@@ -66,6 +66,8 @@ export default function PaymentsPage() {
     pendingPayments: 0,
     pendingRefunds: 0,
   });
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10; // 한 페이지에 표시할 항목 수
 
   useEffect(() => {
     fetchPayments();
@@ -80,7 +82,7 @@ export default function PaymentsPage() {
       setLoading(true);
       
       // 학생, 수업 정보와 함께 조회
-      const { data, error } = await supabase
+      let query = supabase
         .from('payments')
         .select(`
           *,
@@ -97,7 +99,17 @@ export default function PaymentsPage() {
             name,
             tuition_fee
           )
-        `)
+        `);
+
+      // 월 필터 적용 (전체 기간이 아닐 때)
+      if (!showAllPeriod) {
+        const [year, month] = selectedMonth.split('-').map(Number);
+        const firstDayOfMonth = new Date(year, month - 1, 1).toISOString().split('T')[0];
+        const lastDayOfMonth = new Date(year, month, 0).toISOString().split('T')[0];
+        query = query.gte('payment_date', firstDayOfMonth).lte('payment_date', lastDayOfMonth);
+      }
+
+      const { data, error } = await query
         .order('payment_date', { ascending: false })
         .order('created_at', { ascending: false });
 
@@ -327,6 +339,18 @@ export default function PaymentsPage() {
   };
 
   const filteredPayments = getFilteredPayments();
+  
+  // 페이지네이션 계산
+  const totalPages = Math.ceil(filteredPayments.length / ITEMS_PER_PAGE);
+  const paginatedPayments = filteredPayments.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  // 필터나 검색어 변경 시 첫 페이지로 이동
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, typeFilter, statusFilter, selectedMonth, showAllPeriod]);
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -460,31 +484,46 @@ export default function PaymentsPage() {
           {searchTerm ? '검색 결과가 없습니다.' : '등록된 결제가 없습니다.'}
         </div>
       ) : (
-        <div className="border rounded-lg overflow-hidden bg-white">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">
-                  <input
-                    type="checkbox"
-                    checked={selectedPayments.size === filteredPayments.length && filteredPayments.length > 0}
-                    onChange={handleSelectAll}
-                    className="w-4 h-4"
-                  />
-                </TableHead>
-                <TableHead>타입</TableHead>
-                <TableHead>학생명</TableHead>
-                <TableHead>수업명</TableHead>
-                <TableHead>금액</TableHead>
-                <TableHead>결제 방법</TableHead>
-                <TableHead>결제일</TableHead>
-                <TableHead>확인 여부</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredPayments.map((payment) => {
+        <>
+          <div className="border rounded-lg overflow-hidden bg-white">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">
+                    <input
+                      type="checkbox"
+                      checked={selectedPayments.size === paginatedPayments.length && paginatedPayments.length > 0 && paginatedPayments.every(p => selectedPayments.has(p.id))}
+                      onChange={() => {
+                        const allSelected = paginatedPayments.every(p => selectedPayments.has(p.id));
+                        if (allSelected) {
+                          // 현재 페이지의 모든 항목 선택 해제
+                          const newSelected = new Set(selectedPayments);
+                          paginatedPayments.forEach(p => newSelected.delete(p.id));
+                          setSelectedPayments(newSelected);
+                        } else {
+                          // 현재 페이지의 모든 항목 선택
+                          const newSelected = new Set(selectedPayments);
+                          paginatedPayments.forEach(p => newSelected.add(p.id));
+                          setSelectedPayments(newSelected);
+                        }
+                      }}
+                      className="w-4 h-4"
+                    />
+                  </TableHead>
+                  <TableHead>타입</TableHead>
+                  <TableHead>학생명</TableHead>
+                  <TableHead>수업명</TableHead>
+                  <TableHead>금액</TableHead>
+                  <TableHead>결제 방법</TableHead>
+                  <TableHead>결제일</TableHead>
+                  <TableHead>확인 여부</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedPayments.map((payment) => {
                 const isRefund = payment.type === 'refund';
-                const displayAmount = isRefund ? -Math.abs(payment.amount) : payment.amount;
+                // 환불은 음수로 저장되어 있으므로, 절댓값을 사용하여 표시
+                const displayAmount = isRefund ? Math.abs(payment.amount) : payment.amount;
                 
                 return (
                   <TableRow 
@@ -511,7 +550,7 @@ export default function PaymentsPage() {
                     </TableCell>
                     <TableCell>{payment.course_name || '-'}</TableCell>
                     <TableCell className={`font-semibold ${isRefund ? 'text-red-600' : 'text-gray-900'}`}>
-                      {displayAmount.toLocaleString()}원
+                      {isRefund ? '-' : ''}{displayAmount.toLocaleString()}원
                     </TableCell>
                     <TableCell>
                       <select
@@ -590,6 +629,32 @@ export default function PaymentsPage() {
             </TableBody>
           </Table>
         </div>
+        
+        {/* 페이지네이션 */}
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-2 mt-6">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+            >
+              이전
+            </Button>
+            <span className="text-sm text-gray-600">
+              {currentPage} / {totalPages} (총 {filteredPayments.length}건)
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+            >
+              다음
+            </Button>
+          </div>
+        )}
+        </>
       )}
     </div>
   );

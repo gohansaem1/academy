@@ -26,18 +26,30 @@ export default function CoursesPage() {
         .from('courses')
         .select(`
           *,
-          instructors(name),
-          course_enrollments(count)
+          instructors(name)
         `)
         .order('day_of_week', { ascending: true })
         .order('start_time', { ascending: true });
 
       if (error) throw error;
 
-      const coursesWithDetails = (data || []).map((course: any) => ({
-        ...course,
-        instructor_name: course.instructors?.name,
-        enrolled_count: course.course_enrollments?.[0]?.count || 0,
+      // 각 수업별로 재학생 등록 수를 계산
+      const coursesWithDetails = await Promise.all((data || []).map(async (course: any) => {
+        // 재학생만 카운트
+        const { data: enrollments } = await supabase
+          .from('course_enrollments')
+          .select('student_id, students!inner(status)')
+          .eq('course_id', course.id);
+
+        const activeEnrollmentCount = enrollments?.filter((item: any) => 
+          item.students && (item.students.status === 'active' || !item.students.status)
+        ).length || 0;
+
+        return {
+          ...course,
+          instructor_name: course.instructors?.name,
+          enrolled_count: activeEnrollmentCount,
+        };
       }));
 
       setCourses(coursesWithDetails);

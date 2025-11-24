@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import Button from '@/components/common/Button';
 import Input from '@/components/common/Input';
 import { calculateProportionalTuition } from '@/lib/utils/tuition';
+import * as XLSX from 'xlsx';
 
 export default function NewStudentPage() {
   const { user, loading: authLoading } = useAuth('ADMIN');
@@ -30,6 +31,66 @@ export default function NewStudentPage() {
     first_class_date: new Date().toISOString().split('T')[0], // 기본값: 오늘
   });
   const [errors, setErrors] = useState<Partial<Record<keyof StudentFormData, string>>>({});
+
+  const downloadTemplate = async () => {
+    try {
+      // 수업 목록 가져오기 (템플릿에 수업명 예시로 사용)
+      const { data: coursesData } = await supabase
+        .from('courses')
+        .select('name')
+        .order('name')
+        .limit(10);
+
+      const courseNames = coursesData?.map(c => c.name).join(', ') || '화목토 영어 기초반, 월수금 미술 기초반';
+
+      const templateData = [
+        {
+          이름: '홍길동',
+          전화번호: '010-1234-5678',
+          이메일: 'hong@example.com',
+          주소: '서울시 강남구',
+          보호자이름: '홍부모',
+          보호자전화번호: '010-8765-4321',
+          결제일: 25,
+          첫수업일: new Date().toISOString().split('T')[0],
+          수업명: courseNames,
+        },
+        {
+          이름: '김영희',
+          전화번호: '010-2345-6789',
+          이메일: '',
+          주소: '',
+          보호자이름: '김부모',
+          보호자전화번호: '010-7654-3210',
+          결제일: 25,
+          첫수업일: new Date().toISOString().split('T')[0],
+          수업명: '화목토 영어 기초반',
+        },
+      ];
+
+      const worksheet = XLSX.utils.json_to_sheet(templateData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, '학생 등록');
+      
+      // 컬럼 너비 설정
+      worksheet['!cols'] = [
+        { wch: 10 }, // 이름
+        { wch: 15 }, // 전화번호
+        { wch: 20 }, // 이메일
+        { wch: 25 }, // 주소
+        { wch: 12 }, // 보호자이름
+        { wch: 15 }, // 보호자전화번호
+        { wch: 10 }, // 결제일
+        { wch: 12 }, // 첫수업일
+        { wch: 40 }, // 수업명
+      ];
+
+      XLSX.writeFile(workbook, '학생_등록_템플릿.xlsx');
+    } catch (error) {
+      console.error('템플릿 다운로드 오류:', error);
+      alert('템플릿 다운로드 중 오류가 발생했습니다.');
+    }
+  };
 
   useEffect(() => {
     if (!authLoading) {
@@ -250,7 +311,15 @@ export default function NewStudentPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-3xl font-bold mb-6">학생 등록</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">학생 등록</h1>
+        <Button
+          variant="outline"
+          onClick={downloadTemplate}
+        >
+          엑셀 템플릿 다운로드
+        </Button>
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input

@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase/client';
 import { Student } from '@/types/student';
 import { LearningLog } from '@/types/learning-log';
 import { Attendance } from '@/types/attendance';
+import { Payment } from '@/types/payment';
 import { useAuth } from '@/hooks/useAuth';
 import Button from '@/components/common/Button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/common/Table';
@@ -26,6 +27,24 @@ const STATUS_COLORS = {
   early: 'bg-orange-100 text-orange-800',
 };
 
+const PAYMENT_STATUS_LABELS = {
+  pending: '미납',
+  confirmed: '입금확인',
+  cancelled: '취소',
+};
+
+const PAYMENT_STATUS_COLORS = {
+  pending: 'bg-yellow-100 text-yellow-800',
+  confirmed: 'bg-green-100 text-green-800',
+  cancelled: 'bg-red-100 text-red-800',
+};
+
+const PAYMENT_METHODS = {
+  cash: '현금',
+  card: '카드',
+  transfer: '계좌이체',
+};
+
 function StudentDetailContent() {
   const params = useParams();
   const router = useRouter();
@@ -36,12 +55,20 @@ function StudentDetailContent() {
   const [student, setStudent] = useState<Student | null>(null);
   const [learningLogs, setLearningLogs] = useState<LearningLog[]>([]);
   const [attendances, setAttendances] = useState<Attendance[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [logsLoading, setLogsLoading] = useState(false);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [attendanceFilter, setAttendanceFilter] = useState<'all' | 'thisMonth' | 'custom'>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  // 수업 선택 (2개 이상일 때)
+  const [selectedCourseForAttendance, setSelectedCourseForAttendance] = useState<string | null>(null);
+  const [selectedCourseForLearningLogs, setSelectedCourseForLearningLogs] = useState<string | null>(null);
+  // 페이지네이션 상태 (수업별로 관리)
+  const [attendancePages, setAttendancePages] = useState<Record<string, number>>({});
+  const [learningLogPages, setLearningLogPages] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (params.id) {
@@ -50,9 +77,61 @@ function StudentDetailContent() {
         fetchLearningLogs(params.id as string);
       } else if (activeTab === 'attendance') {
         fetchAttendances(params.id as string);
+      } else if (activeTab === 'payments') {
+        fetchPayments(params.id as string);
       }
     }
   }, [params.id, activeTab]);
+
+  // 출석 기록 탭에서 수업이 2개 이상일 때 첫 번째 수업 자동 선택
+  useEffect(() => {
+    if (activeTab === 'attendance' && attendances.length > 0 && !selectedCourseForAttendance) {
+      const groupedByCourse = attendances.reduce((acc, attendance) => {
+        const courseName = attendance.course_name || '미지정 수업';
+        if (!acc[courseName]) {
+          acc[courseName] = [];
+        }
+        acc[courseName].push(attendance);
+        return acc;
+      }, {} as Record<string, Attendance[]>);
+      
+      const courseNames = Object.keys(groupedByCourse);
+      if (courseNames.length >= 2) {
+        setSelectedCourseForAttendance(courseNames[0]);
+      }
+    }
+  }, [activeTab, attendances, selectedCourseForAttendance]);
+
+  // 학습일지 탭에서 수업이 2개 이상일 때 첫 번째 수업 자동 선택
+  useEffect(() => {
+    if (activeTab === 'learning-logs' && learningLogs.length > 0 && !selectedCourseForLearningLogs) {
+      const groupedByCourse = learningLogs.reduce((acc, log) => {
+        const courseName = log.course_name || '미지정 수업';
+        if (!acc[courseName]) {
+          acc[courseName] = [];
+        }
+        acc[courseName].push(log);
+        return acc;
+      }, {} as Record<string, LearningLog[]>);
+      
+      const courseNames = Object.keys(groupedByCourse);
+      if (courseNames.length >= 2) {
+        setSelectedCourseForLearningLogs(courseNames[0]);
+      }
+    }
+  }, [activeTab, learningLogs, selectedCourseForLearningLogs]);
+
+  // 탭 변경 시 수업 선택 및 페이지네이션 초기화
+  useEffect(() => {
+    if (activeTab !== 'attendance') {
+      setSelectedCourseForAttendance(null);
+      setAttendancePages({});
+    }
+    if (activeTab !== 'learning-logs') {
+      setSelectedCourseForLearningLogs(null);
+      setLearningLogPages({});
+    }
+  }, [activeTab]);
 
   const fetchStudent = async (id: string) => {
     try {
@@ -101,6 +180,20 @@ function StudentDetailContent() {
   const fetchLearningLogs = async (studentId: string) => {
     try {
       setLogsLoading(true);
+      
+      // 학생 정보 조회 (first_class_date 확인용)
+      const { data: studentData, error: studentError } = await supabase
+        .from('students')
+        .select('first_class_date')
+        .eq('id', studentId)
+        .single();
+
+      if (studentError) throw studentError;
+
+      const firstClassDate = studentData?.first_class_date 
+        ? new Date(studentData.first_class_date)
+        : null;
+
       // 학생이 수강하는 수업 조회
       const { data: enrollments, error: enrollmentError } = await supabase
         .from('course_enrollments')
@@ -118,7 +211,7 @@ function StudentDetailContent() {
       const courseIds = enrollments.map(e => e.course_id);
 
       // 해당 수업들의 학습일지 조회
-      const { data, error } = await supabase
+      let query = supabase
         .from('learning_logs')
         .select(`
           *,
@@ -130,7 +223,15 @@ function StudentDetailContent() {
             name
           )
         `)
-        .in('course_id', courseIds)
+        .in('course_id', courseIds);
+
+      // 첫 수업일 이후의 학습일지만 조회
+      if (firstClassDate) {
+        const firstClassDateStr = firstClassDate.toISOString().split('T')[0];
+        query = query.gte('date', firstClassDateStr);
+      }
+
+      const { data, error } = await query
         .order('date', { ascending: false })
         .limit(20);
 
@@ -208,6 +309,41 @@ function StudentDetailContent() {
       fetchAttendances(params.id as string);
     }
   }, [attendanceFilter, startDate, endDate]);
+
+  const fetchPayments = async (studentId: string) => {
+    try {
+      setPaymentsLoading(true);
+      const { data, error } = await supabase
+        .from('payments')
+        .select(`
+          *,
+          courses:course_id (
+            id,
+            name,
+            subject,
+            tuition_fee
+          )
+        `)
+        .eq('student_id', studentId)
+        .order('payment_date', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const paymentsWithNames = (data || []).map((payment: any) => ({
+        ...payment,
+        course_name: payment.courses?.name,
+        course_tuition_fee: payment.courses?.tuition_fee,
+      }));
+
+      setPayments(paymentsWithNames);
+    } catch (error) {
+      console.error('결제 정보 조회 오류:', error);
+      alert('결제 정보를 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      setPaymentsLoading(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (!confirm('정말 삭제하시겠습니까?')) return;
@@ -313,6 +449,16 @@ function StudentDetailContent() {
           }`}
         >
           학습일지
+        </button>
+        <button
+          onClick={() => router.push(`/students/${params.id}?tab=payments`)}
+          className={`px-4 py-2 font-medium transition-colors ${
+            activeTab === 'payments'
+              ? 'border-b-2 border-blue-600 text-blue-600'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          결제정보
         </button>
       </div>
 
@@ -517,52 +663,148 @@ function StudentDetailContent() {
             </div>
           </div>
 
-          {/* 출석 기록 테이블 */}
+          {/* 출석 기록 테이블 - 수업별로 구분 */}
           {attendanceLoading ? (
             <div className="text-center py-8">로딩 중...</div>
           ) : attendances.length === 0 ? (
             <div className="text-center py-8 text-gray-500 border rounded-lg">
               출석 기록이 없습니다.
             </div>
-          ) : (
-            <div className="border rounded-lg overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>날짜</TableHead>
-                    <TableHead>수업명</TableHead>
-                    <TableHead>출석 상태</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {attendances.map((attendance) => (
-                    <TableRow key={attendance.id}>
-                      <TableCell>
-                        {new Date(attendance.date).toLocaleDateString('ko-KR', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                          weekday: 'short',
-                        })}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {attendance.course_name || '-'}
-                      </TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded text-sm ${STATUS_COLORS[attendance.status]}`}>
-                          {STATUS_LABELS[attendance.status]}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+          ) : (() => {
+            // 수업별로 그룹화
+            const groupedByCourse = attendances.reduce((acc, attendance) => {
+              const courseName = attendance.course_name || '미지정 수업';
+              if (!acc[courseName]) {
+                acc[courseName] = [];
+              }
+              acc[courseName].push(attendance);
+              return acc;
+            }, {} as Record<string, Attendance[]>);
+
+            const courseNames = Object.keys(groupedByCourse);
+            const hasMultipleCourses = courseNames.length >= 2;
+            const ITEMS_PER_PAGE_ATTENDANCE = 10;
+
+            // 선택된 수업 또는 모든 수업 표시
+            const coursesToShow = hasMultipleCourses && selectedCourseForAttendance
+              ? { [selectedCourseForAttendance]: groupedByCourse[selectedCourseForAttendance] }
+              : groupedByCourse;
+
+            return (
+              <div className="space-y-6">
+                {/* 수업 선택 탭 (2개 이상일 때) */}
+                {hasMultipleCourses && (
+                  <div className="bg-white border rounded-lg p-4">
+                    <div className="flex gap-2 border-b">
+                      {courseNames.map((courseName) => (
+                        <button
+                          key={courseName}
+                          onClick={() => {
+                            setSelectedCourseForAttendance(courseName);
+                            setAttendancePages({ ...attendancePages, [courseName]: 1 });
+                          }}
+                          className={`px-4 py-2 font-medium transition-colors ${
+                            selectedCourseForAttendance === courseName
+                              ? 'border-b-2 border-blue-600 text-blue-600'
+                              : 'text-gray-600 hover:text-gray-900'
+                          }`}
+                        >
+                          {courseName}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {Object.entries(coursesToShow).map(([courseName, courseAttendances]) => {
+                  const courseStats = {
+                    present: courseAttendances.filter(a => a.status === 'present').length,
+                    late: courseAttendances.filter(a => a.status === 'late').length,
+                    absent: courseAttendances.filter(a => a.status === 'absent').length,
+                    early: courseAttendances.filter(a => a.status === 'early').length,
+                    total: courseAttendances.length,
+                  };
+
+                  const currentPage = attendancePages[courseName] || 1;
+                  const totalPages = Math.ceil(courseAttendances.length / ITEMS_PER_PAGE_ATTENDANCE);
+                  const paginatedAttendances = courseAttendances.slice(
+                    (currentPage - 1) * ITEMS_PER_PAGE_ATTENDANCE,
+                    currentPage * ITEMS_PER_PAGE_ATTENDANCE
+                  );
+
+                  return (
+                    <div key={courseName} className="bg-white border rounded-lg overflow-hidden">
+                      <div className="bg-blue-50 px-4 py-3 border-b">
+                        <h3 className="text-lg font-semibold text-blue-900">{courseName}</h3>
+                        <div className="flex gap-4 mt-2 text-sm">
+                          <span className="text-green-600">출석: {courseStats.present}</span>
+                          <span className="text-yellow-600">지각: {courseStats.late}</span>
+                          <span className="text-red-600">결석: {courseStats.absent}</span>
+                          <span className="text-orange-600">조퇴: {courseStats.early}</span>
+                          <span className="text-gray-600">총 {courseStats.total}건</span>
+                        </div>
+                      </div>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>날짜</TableHead>
+                            <TableHead>출석 상태</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {paginatedAttendances.map((attendance) => (
+                            <TableRow key={attendance.id}>
+                              <TableCell>
+                                {new Date(attendance.date).toLocaleDateString('ko-KR', {
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric',
+                                  weekday: 'short',
+                                })}
+                              </TableCell>
+                              <TableCell>
+                                <span className={`px-2 py-1 rounded text-sm ${STATUS_COLORS[attendance.status]}`}>
+                                  {STATUS_LABELS[attendance.status]}
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      {/* 페이지네이션 */}
+                      {totalPages > 1 && (
+                        <div className="flex justify-center items-center gap-2 p-4 border-t">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setAttendancePages({ ...attendancePages, [courseName]: Math.max(1, currentPage - 1) })}
+                            disabled={currentPage === 1}
+                          >
+                            이전
+                          </Button>
+                          <span className="text-sm text-gray-600">
+                            {currentPage} / {totalPages}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setAttendancePages({ ...attendancePages, [courseName]: Math.min(totalPages, currentPage + 1) })}
+                            disabled={currentPage === totalPages}
+                          >
+                            다음
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       )}
 
-      {/* 학습일지 탭 */}
+      {/* 학습일지 탭 - 수업별로 구분 */}
       {activeTab === 'learning-logs' && (
         <div>
           <h2 className="text-2xl font-semibold mb-4">학습일지</h2>
@@ -572,54 +814,278 @@ function StudentDetailContent() {
             <div className="text-center py-8 text-gray-500 border rounded-lg">
               등록된 학습일지가 없습니다.
             </div>
-          ) : (
-            <div className="space-y-4">
-              {learningLogs.map((log) => (
-                <div key={log.id} className="bg-white border rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <h3 className="font-semibold text-lg">{log.course_name || '-'}</h3>
-                      <p className="text-sm text-gray-500">
-                        {new Date(log.date).toLocaleDateString('ko-KR')} | 작성자: {log.instructor_name || '-'}
-                      </p>
+          ) : (() => {
+            // 수업별로 그룹화
+            const groupedByCourse = learningLogs.reduce((acc, log) => {
+              const courseName = log.course_name || '미지정 수업';
+              if (!acc[courseName]) {
+                acc[courseName] = [];
+              }
+              acc[courseName].push(log);
+              return acc;
+            }, {} as Record<string, LearningLog[]>);
+
+            const courseNames = Object.keys(groupedByCourse);
+            const hasMultipleCourses = courseNames.length >= 2;
+            const ITEMS_PER_PAGE_LEARNING_LOGS = 6;
+
+            // 선택된 수업 또는 모든 수업 표시
+            const coursesToShow = hasMultipleCourses && selectedCourseForLearningLogs
+              ? { [selectedCourseForLearningLogs]: groupedByCourse[selectedCourseForLearningLogs] }
+              : groupedByCourse;
+
+            return (
+              <div className="space-y-6">
+                {/* 수업 선택 탭 (2개 이상일 때) */}
+                {hasMultipleCourses && (
+                  <div className="bg-white border rounded-lg p-4">
+                    <div className="flex gap-2 border-b">
+                      {courseNames.map((courseName) => (
+                        <button
+                          key={courseName}
+                          onClick={() => {
+                            setSelectedCourseForLearningLogs(courseName);
+                            setLearningLogPages({ ...learningLogPages, [courseName]: 1 });
+                          }}
+                          className={`px-4 py-2 font-medium transition-colors ${
+                            selectedCourseForLearningLogs === courseName
+                              ? 'border-b-2 border-blue-600 text-blue-600'
+                              : 'text-gray-600 hover:text-gray-900'
+                          }`}
+                        >
+                          {courseName}
+                        </button>
+                      ))}
                     </div>
                   </div>
-                  <div className="mt-3 space-y-2">
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">학습 내용</label>
-                      <div className="text-sm mt-1">
-                        <p className="whitespace-pre-wrap">
-                          {log.content}
-                          {log.student_comments && Object.keys(log.student_comments).length > 0 && (
-                            <>
-                              {Object.entries(log.student_comments).map(([studentId, comment]) => (
-                                <span key={studentId}>
-                                  {'\n\n'}
-                                  {comment as string}
-                                </span>
-                              ))}
-                            </>
-                          )}
-                        </p>
+                )}
+
+                {Object.entries(coursesToShow).map(([courseName, courseLogs]) => {
+                  const currentPage = learningLogPages[courseName] || 1;
+                  const totalPages = Math.ceil(courseLogs.length / ITEMS_PER_PAGE_LEARNING_LOGS);
+                  const paginatedLogs = courseLogs.slice(
+                    (currentPage - 1) * ITEMS_PER_PAGE_LEARNING_LOGS,
+                    currentPage * ITEMS_PER_PAGE_LEARNING_LOGS
+                  );
+
+                  return (
+                    <div key={courseName} className="bg-white border rounded-lg overflow-hidden">
+                      <div className="bg-blue-50 px-4 py-3 border-b">
+                        <h3 className="text-lg font-semibold text-blue-900">{courseName}</h3>
+                        <p className="text-sm text-gray-600 mt-1">총 {courseLogs.length}건</p>
                       </div>
+                      <div className="p-4 space-y-4">
+                        {paginatedLogs.map((log) => (
+                          <div key={log.id} className="border-b last:border-b-0 pb-4 last:pb-0">
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <p className="text-sm text-gray-500">
+                                  {new Date(log.date).toLocaleDateString('ko-KR')} | 작성자: {log.instructor_name || '-'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="mt-3 space-y-2">
+                              <div>
+                                <label className="text-sm font-medium text-gray-500">학습 내용</label>
+                                <div className="text-sm mt-1">
+                                  <p className="whitespace-pre-wrap">
+                                    {log.content}
+                                    {log.student_comments && Object.keys(log.student_comments).length > 0 && (
+                                      <>
+                                        {Object.entries(log.student_comments).map(([studentId, comment]) => (
+                                          <span key={studentId}>
+                                            {'\n\n'}
+                                            {comment as string}
+                                          </span>
+                                        ))}
+                                      </>
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
+                              {log.homework && (
+                                <div>
+                                  <label className="text-sm font-medium text-gray-500">숙제</label>
+                                  <p className="text-sm mt-1 whitespace-pre-wrap">{log.homework}</p>
+                                </div>
+                              )}
+                              {log.notes && (
+                                <div>
+                                  <label className="text-sm font-medium text-gray-500">특이사항</label>
+                                  <p className="text-sm mt-1 whitespace-pre-wrap">{log.notes}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {/* 페이지네이션 */}
+                      {totalPages > 1 && (
+                        <div className="flex justify-center items-center gap-2 p-4 border-t">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setLearningLogPages({ ...learningLogPages, [courseName]: Math.max(1, currentPage - 1) })}
+                            disabled={currentPage === 1}
+                          >
+                            이전
+                          </Button>
+                          <span className="text-sm text-gray-600">
+                            {currentPage} / {totalPages}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setLearningLogPages({ ...learningLogPages, [courseName]: Math.min(totalPages, currentPage + 1) })}
+                            disabled={currentPage === totalPages}
+                          >
+                            다음
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                    {log.homework && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">숙제</label>
-                        <p className="text-sm mt-1 whitespace-pre-wrap">{log.homework}</p>
-                      </div>
-                    )}
-                    {log.notes && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">특이사항</label>
-                        <p className="text-sm mt-1 whitespace-pre-wrap">{log.notes}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* 결제정보 탭 */}
+      {activeTab === 'payments' && (
+        <div className="space-y-6">
+          {paymentsLoading ? (
+            <div className="text-center py-8">로딩 중...</div>
+          ) : payments.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 border rounded-lg">
+              결제 정보가 없습니다.
             </div>
-          )}
+          ) : (() => {
+            // 수업별로 그룹화
+            const groupedByCourse = payments.reduce((acc, payment) => {
+              const courseName = payment.course_name || '미지정 수업';
+              if (!acc[courseName]) {
+                acc[courseName] = [];
+              }
+              acc[courseName].push(payment);
+              return acc;
+            }, {} as Record<string, Payment[]>);
+
+            // 통계 계산
+            const calculateCourseStats = (coursePayments: Payment[]) => {
+              return {
+                totalPayments: coursePayments
+                  .filter(p => p.type === 'payment')
+                  .reduce((sum, p) => sum + Math.abs(p.amount), 0),
+                totalRefunds: coursePayments
+                  .filter(p => p.type === 'refund')
+                  .reduce((sum, p) => sum + Math.abs(p.amount), 0),
+                confirmedPayments: coursePayments
+                  .filter(p => p.type === 'payment' && p.status === 'confirmed')
+                  .reduce((sum, p) => sum + Math.abs(p.amount), 0),
+                pendingPayments: coursePayments
+                  .filter(p => p.type === 'payment' && p.status === 'pending')
+                  .reduce((sum, p) => sum + Math.abs(p.amount), 0),
+              };
+            };
+
+            return (
+              <div className="space-y-6">
+                {Object.entries(groupedByCourse).map(([courseName, coursePayments]) => {
+                  const stats = calculateCourseStats(coursePayments);
+                  const netAmount = stats.totalPayments - stats.totalRefunds;
+
+                  return (
+                    <div key={courseName} className="bg-white border rounded-lg overflow-hidden">
+                      <div className="bg-blue-50 px-4 py-3 border-b">
+                        <h3 className="text-lg font-semibold text-blue-900">{courseName}</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3">
+                          <div className="bg-white rounded p-2">
+                            <div className="text-xs text-gray-500">총 결제액</div>
+                            <div className="text-lg font-bold text-blue-600">
+                              {stats.totalPayments.toLocaleString()}원
+                            </div>
+                          </div>
+                          <div className="bg-white rounded p-2">
+                            <div className="text-xs text-gray-500">총 환불액</div>
+                            <div className="text-lg font-bold text-red-600">
+                              {stats.totalRefunds.toLocaleString()}원
+                            </div>
+                          </div>
+                          <div className="bg-white rounded p-2">
+                            <div className="text-xs text-gray-500">입금확인액</div>
+                            <div className="text-lg font-bold text-green-600">
+                              {stats.confirmedPayments.toLocaleString()}원
+                            </div>
+                          </div>
+                          <div className="bg-white rounded p-2">
+                            <div className="text-xs text-gray-500">미납액</div>
+                            <div className="text-lg font-bold text-yellow-600">
+                              {stats.pendingPayments.toLocaleString()}원
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-3 pt-3 border-t">
+                          <div className="text-sm text-gray-600">
+                            순수강료: <span className="font-bold text-lg">{netAmount.toLocaleString()}원</span>
+                          </div>
+                        </div>
+                      </div>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>날짜</TableHead>
+                            <TableHead>구분</TableHead>
+                            <TableHead>금액</TableHead>
+                            <TableHead>결제방법</TableHead>
+                            <TableHead>상태</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {coursePayments.map((payment) => {
+                            const isRefund = payment.type === 'refund';
+                            const displayAmount = Math.abs(payment.amount);
+
+                            return (
+                              <TableRow 
+                                key={payment.id}
+                                className={isRefund ? 'bg-red-50' : ''}
+                              >
+                                <TableCell>
+                                  {new Date(payment.payment_date).toLocaleDateString('ko-KR')}
+                                </TableCell>
+                                <TableCell>
+                                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                    isRefund 
+                                      ? 'bg-red-100 text-red-800' 
+                                      : 'bg-blue-100 text-blue-800'
+                                  }`}>
+                                    {isRefund ? '환불' : '수강료'}
+                                  </span>
+                                </TableCell>
+                                <TableCell className={`font-semibold ${isRefund ? 'text-red-600' : 'text-gray-900'}`}>
+                                  {isRefund ? '-' : ''}{displayAmount.toLocaleString()}원
+                                </TableCell>
+                                <TableCell>
+                                  {PAYMENT_METHODS[payment.payment_method] || payment.payment_method}
+                                </TableCell>
+                                <TableCell>
+                                  <span className={`px-2 py-1 rounded text-xs ${PAYMENT_STATUS_COLORS[payment.status]}`}>
+                                    {PAYMENT_STATUS_LABELS[payment.status]}
+                                  </span>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       )}
 

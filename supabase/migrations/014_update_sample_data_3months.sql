@@ -750,6 +750,7 @@ BEGIN
       last_class_day := EXTRACT(DAY FROM student_record.last_class_date)::INTEGER;
       
       -- 미수업 일수 = 총 일수 - 마지막 수업일 (마지막 수업일 이후의 날짜들)
+      -- 마지막 수업일이 10일이면, 11일부터 마지막 날까지가 미수업 일수
       unattended_days := total_days_in_refund_month - last_class_day;
       
       -- 환불 금액 계산
@@ -757,15 +758,18 @@ BEGIN
       
       -- 첫 달과 마지막 달이 같은 경우
       IF first_class_year IS NOT NULL AND first_class_year = refund_year AND first_class_month = refund_month THEN
-        -- 첫 달 미수업 부분 환불
+        -- 첫 달 미수업 부분 환불 (마지막 수업일 이후의 날짜들)
+        -- 예: 마지막 수업일이 10일이고 총 30일이면, 11일~30일 = 20일 미수업
         IF unattended_days > 0 THEN
           refund_amount := ROUND((course_record.tuition_fee::NUMERIC * unattended_days) / total_days_in_refund_month);
         END IF;
         
         -- 다음 달 전액 환불 (첫 달 결제에 포함되어 있었음)
+        -- 등록 시 첫 달 남은일수 + 다음 달 전액을 받았으므로, 다음 달 전액은 무조건 환불
         refund_amount := refund_amount + course_record.tuition_fee;
       ELSE
         -- 일반적인 경우: 마지막 수업일이 속한 달의 미수업 부분만 환불
+        -- 마지막 수업일 이후의 날짜들에 대한 환불
         IF unattended_days > 0 THEN
           refund_amount := ROUND((course_record.tuition_fee::NUMERIC * unattended_days) / total_days_in_refund_month);
         END IF;
@@ -773,25 +777,18 @@ BEGIN
       
       -- 환불 항목 생성 (음수 금액으로 저장, 금액이 0보다 큰 경우만)
       -- 첫 달과 마지막 달이 같은 경우는 무조건 환불 생성 (다음 달 전액이 포함되므로)
-      IF refund_amount > 0 OR (first_class_year IS NOT NULL AND first_class_year = refund_year AND first_class_month = refund_month) THEN
-        -- 첫 달과 마지막 달이 같은 경우 refund_amount가 0이면 다음 달 전액만 환불
-        IF refund_amount = 0 AND first_class_year IS NOT NULL AND first_class_year = refund_year AND first_class_month = refund_month THEN
-          refund_amount := course_record.tuition_fee;
-        END IF;
-        
-        IF refund_amount > 0 THEN
-          INSERT INTO payments (student_id, course_id, amount, payment_method, payment_date, status, type, created_at)
-          VALUES (
-            enrollment_record.student_id,
-            enrollment_record.course_id,
-            -refund_amount, -- 음수로 저장
-            'card',
-            refund_payment_date,
-            CASE WHEN RANDOM() < 0.5 THEN 'pending' ELSE 'confirmed' END, -- 50% 확률로 미지급/환불확인
-            'refund', -- 환불 타입
-            refund_payment_date
-          );
-        END IF;
+      IF refund_amount > 0 THEN
+        INSERT INTO payments (student_id, course_id, amount, payment_method, payment_date, status, type, created_at)
+        VALUES (
+          enrollment_record.student_id,
+          enrollment_record.course_id,
+          -refund_amount, -- 음수로 저장
+          'card',
+          refund_payment_date,
+          CASE WHEN RANDOM() < 0.5 THEN 'pending' ELSE 'confirmed' END, -- 50% 확률로 미지급/환불확인
+          'refund', -- 환불 타입
+          refund_payment_date
+        );
       END IF;
     END LOOP; -- 수업 루프 종료
   END LOOP; -- 학생 루프 종료
